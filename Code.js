@@ -25,10 +25,12 @@ function onOpen() {
   const mainMenu = ui.createMenu('Restaurant Analytics');
 
   // Backend operations
-  mainMenu.addItem('ONE-TIME SETUP: Authorize & Activate', 'runInitialSetup')
+  mainMenu.addItem('🔐 Configure Secure Credentials', 'SecureConfig.initialize')
+    .addItem('ONE-TIME SETUP: Authorize & Activate', 'runInitialSetup')
     .addSeparator()
     .addItem('Run Full Data Ingestion (Manual)', 'startFullIngestion')
     .addItem('Show Status Dashboard', 'showDashboard')
+    .addItem('Check Credential Status', 'checkCredentialStatus')
     .addSeparator();
 
   // Frontend operations submenu
@@ -38,18 +40,45 @@ function onOpen() {
     .addSeparator()
     .addItem('Send Test Daily Report', 'sendTestDailyReport')
     .addItem('Send Test Weekly Report', 'sendTestWeeklyReport')
-    .addItem('Test Chart Generation', 'testChartGeneration')
+    .addItem('Test Chart Generation', 'testChartGeneration');
+
+  // Trigger management submenu
+  const triggerMenu = ui.createMenu('⏰ Automated Triggers');
+  triggerMenu.addItem('📅 Set Up Daily Reports (Tue-Sun @ 8AM)', 'TriggerManager.setupDailyReportTrigger')
+    .addItem('📈 Set Up Weekly Reports (Mon @ 8AM)', 'TriggerManager.setupWeeklyReportTrigger')
+    .addItem('🚀 Set Up All Report Triggers', 'TriggerManager.setupAllReportTriggers')
     .addSeparator()
-    .addItem('Enable Daily Reports', 'enableDailyReports')
-    .addItem('Enable Weekly Reports', 'enableWeeklyReports')
-    .addItem('Disable All Reports', 'disableAllReports')
+    .addItem('🔍 View Trigger Status', 'TriggerManager.viewTriggerStatus')
+    .addItem('🧪 Test Configuration', 'TriggerManager.testTriggerConfiguration')
     .addSeparator()
-    .addItem('View Report Schedule', 'viewReportSchedule');
+    .addItem('❌ Remove All Report Triggers', 'TriggerManager.removeAllReportTriggers');
 
   mainMenu.addSubMenu(frontendMenu)
+    .addSubMenu(triggerMenu)
     .addSeparator()
     .addItem('About', 'showAbout')
     .addToUi();
+}
+
+/**
+ * Check if credentials are configured
+ */
+function checkCredentialStatus() {
+  const ui = SpreadsheetApp.getUi();
+  const status = SecureConfig.checkConfiguration();
+
+  let message = 'Credential Status:\n\n';
+  message += `✅ GCP Private Key: ${status.gcpPrivateKey ? 'Configured' : '❌ Not configured'}\n`;
+  message += `✅ GCP Service Account: ${status.gcpServiceAccount ? 'Configured' : '❌ Not configured'}\n`;
+  message += `✅ Gemini API Key: ${status.geminiApiKey ? 'Configured' : '❌ Not configured'}\n\n`;
+
+  if (!status.gcpPrivateKey || !status.geminiApiKey) {
+    message += 'Please run "Configure Secure Credentials" from the menu.';
+  } else {
+    message += 'All credentials are properly configured!';
+  }
+
+  ui.alert('Credential Configuration Status', message, ui.ButtonSet.OK);
 }
 
 /**
@@ -548,10 +577,180 @@ function generateWeeklyReport() {
   try {
     ErrorHandler.info('WeeklyReport', 'Starting automated weekly report generation');
 
-    // TODO: Implement weekly report generation
-    // This will be implemented in the next phase
-    ErrorHandler.info('WeeklyReport', 'Weekly report generation not yet implemented');
+    const reportData = WeeklyReport.generate();
+    const success = EmailService.sendWeeklyReport(reportData);
+
+    if (success) {
+      ErrorHandler.info('WeeklyReport', 'Weekly report sent successfully');
+    } else {
+      ErrorHandler.error('WeeklyReport', 'Failed to send weekly report');
+    }
   } catch (error) {
     ErrorHandler.handleError(error, 'generateWeeklyReport', {}, true);
+  }
+}
+
+/**
+ * Test function to send a daily report (menu item)
+ */
+function sendTestDailyReport() {
+  const ui = SpreadsheetApp.getUi();
+
+  try {
+    ui.alert('📊 Generating Test Daily Report',
+      'Generating daily report for yesterday...\n\n' +
+      'This may take a moment.',
+      ui.ButtonSet.OK);
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const reportData = DailyReport.generate(yesterday);
+    const success = EmailService.sendDailyReport(reportData);
+
+    if (success) {
+      ui.alert('✅ Daily Report Sent',
+        `Test daily report for ${Config.formatDate(yesterday)} has been sent to:\n\n` +
+        `${Config.EMAIL.defaultRecipient || Session.getActiveUser().getEmail()}`,
+        ui.ButtonSet.OK);
+    } else {
+      throw new Error('Failed to send email');
+    }
+  } catch (error) {
+    ui.alert('❌ Report Failed',
+      'Failed to generate daily report:\n\n' + error.toString(),
+      ui.ButtonSet.OK);
+    ErrorHandler.handleError(error, 'sendTestDailyReport');
+  }
+}
+
+/**
+ * Test function to send a weekly report (menu item)
+ */
+function sendTestWeeklyReport() {
+  const ui = SpreadsheetApp.getUi();
+
+  try {
+    ui.alert('📈 Generating Test Weekly Report',
+      'Generating weekly report for last week...\n\n' +
+      'This may take a moment.',
+      ui.ButtonSet.OK);
+
+    const reportData = WeeklyReport.generate();
+    const success = EmailService.sendWeeklyReport(reportData);
+
+    if (success) {
+      ui.alert('✅ Weekly Report Sent',
+        `Test weekly report has been sent to:\n\n` +
+        `${Config.EMAIL.defaultRecipient || Session.getActiveUser().getEmail()}`,
+        ui.ButtonSet.OK);
+    } else {
+      throw new Error('Failed to send email');
+    }
+  } catch (error) {
+    ui.alert('❌ Report Failed',
+      'Failed to generate weekly report:\n\n' + error.toString(),
+      ui.ButtonSet.OK);
+    ErrorHandler.handleError(error, 'sendTestWeeklyReport');
+  }
+}
+
+/**
+ * Test chart generation (menu item)
+ */
+function testChartGeneration() {
+  const ui = SpreadsheetApp.getUi();
+
+  try {
+    // Generate a test chart
+    const testData = [100, 150, 125, 175, 200];
+    const testLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+    const chartUrl = ChartGenerator.generateLineChart(
+      testData,
+      'Test Sales Chart',
+      600, 300,
+      null,
+      testLabels
+    );
+
+    // Create a simple HTML dialog to display the chart
+    const html = HtmlService.createHtmlOutput(`
+      <div style="text-align: center; padding: 20px;">
+        <h3>Test Chart Generated</h3>
+        <img src="${chartUrl}" style="max-width: 100%; border: 1px solid #ddd; margin: 10px 0;">
+        <p>Chart URL has been logged to console.</p>
+        <p style="word-break: break-all; font-size: 10px; color: #666;">
+          ${chartUrl.substring(0, 100)}...
+        </p>
+      </div>
+    `)
+      .setWidth(650)
+      .setHeight(450);
+
+    ui.showModalDialog(html, 'Chart Test');
+
+    Logger.log('Test chart URL: ' + chartUrl);
+  } catch (error) {
+    ui.alert('❌ Chart Generation Failed',
+      'Error: ' + error.toString(),
+      ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Setup frontend tables in BigQuery (menu item)
+ */
+function setupFrontendTables() {
+  const ui = SpreadsheetApp.getUi();
+
+  try {
+    ui.alert('📋 Setting Up Frontend Tables',
+      'Creating BigQuery tables for frontend analytics...',
+      ui.ButtonSet.OK);
+
+    SchemaSetup.setupFrontendTables();
+
+    ui.alert('✅ Tables Created',
+      'Frontend analytics tables have been set up in BigQuery.',
+      ui.ButtonSet.OK);
+  } catch (error) {
+    ui.alert('❌ Setup Failed',
+      'Error: ' + error.toString(),
+      ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Configure frontend report settings (menu item)
+ */
+function configureFrontendSettings() {
+  const ui = SpreadsheetApp.getUi();
+
+  // Get current recipient
+  const currentRecipient = Config.EMAIL.defaultRecipient || Session.getActiveUser().getEmail();
+
+  const result = ui.prompt(
+    '📧 Configure Report Recipient',
+    `Current recipient: ${currentRecipient}\n\n` +
+    'Enter email address for reports:',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (result.getSelectedButton() === ui.Button.OK) {
+    const email = result.getResponseText();
+
+    if (email && email.includes('@')) {
+      // Store in Script Properties
+      PropertiesService.getScriptProperties().setProperty('REPORT_RECIPIENT', email);
+
+      ui.alert('✅ Recipient Updated',
+        `Reports will be sent to: ${email}`,
+        ui.ButtonSet.OK);
+    } else {
+      ui.alert('❌ Invalid Email',
+        'Please enter a valid email address.',
+        ui.ButtonSet.OK);
+    }
   }
 }

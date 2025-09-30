@@ -105,9 +105,9 @@ const Config = {
 
   // Web App Settings (for form submissions)
   WEB_APP: {
-    url: null,  // Will be set after deployment
+    url: 'https://script.google.com/macros/s/AKfycbx8xGMj30x1W1o4gLEzK7r6Ypfvar0cYzfRb1ve3W57eFFQL-h8qZodninvCW46QcQtNg/exec',
     corsAllowedOrigins: ['https://mail.google.com'],
-    enabled: false  // Enable after web app deployment
+    enabled: true
   },
 
   // System Settings
