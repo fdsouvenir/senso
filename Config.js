@@ -105,7 +105,7 @@ const Config = {
 
   // Web App Settings (for form submissions)
   WEB_APP: {
-    url: 'https://script.google.com/macros/s/AKfycbxuAqqfW7w4taoNCVlP6L21nkvg0RGmNCrQ7_Kq45I_BTD2Jvu0JqOJjcy_y9Q2L8Ng/exec',
+    url: 'https://script.google.com/macros/s/AKfycbxW0SkKpUH5C3i7O05KtxOi5BFPX7zQxR4rYnZXAXIHDUp61iPNZTGJb6if4EPGA5ER7g/exec',
     corsAllowedOrigins: ['https://mail.google.com'],
     enabled: true
   },
