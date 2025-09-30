@@ -162,25 +162,25 @@ const EmailService = {
     <div class="content">
       <!-- Key Metrics -->
       <div class="metric-card">
-        <div class="metric-value">$${data.totalSales.toLocaleString()}</div>
+        <div class="metric-value">$${(data.totalSales || 0).toLocaleString()}</div>
         <div class="metric-label">${data.dayName} Total Sales</div>
         <div class="comparison">
-          ${changeSymbol} ${Math.abs(data.percentChange).toFixed(1)}% vs last ${data.dayName}
+          ${changeSymbol} ${Math.abs(data.percentChange || 0).toFixed(1)}% vs last ${data.dayName}
         </div>
         ${data.contextNote ? `<div style="color: #666; margin-top: 10px; font-style: italic;">${data.contextNote}</div>` : ''}
       </div>
 
       <!-- Category Breakdown -->
-      ${data.categories.map(category => `
+      ${(data.categories || []).map(category => `
         <div class="category-section">
           <div class="category-title">${category.name}</div>
           <table class="item-table">
-            ${category.items.slice(0, 5).map((item, index) => `
+            ${(category.items || []).slice(0, 5).map((item, index) => `
               <tr>
                 <td class="item-rank">${index + 1}</td>
                 <td class="item-name">${item.name}</td>
-                <td class="item-sales">$${item.sales.toLocaleString()}</td>
-                <td class="item-quantity">${item.quantity} sold</td>
+                <td class="item-sales">$${(item.sales || 0).toLocaleString()}</td>
+                <td class="item-quantity">${item.quantity || 0} sold</td>
               </tr>
             `).join('')}
           </table>
@@ -198,9 +198,9 @@ const EmailService = {
       <!-- Prediction -->
       <div class="prediction-box">
         <div class="prediction-title">Tomorrow's Forecast</div>
-        <div class="prediction-value">Prediction #${data.prediction.id}: $${data.prediction.amount.toLocaleString()}</div>
+        <div class="prediction-value">Prediction #${data.prediction.id}: $${(data.prediction.amount || 0).toLocaleString()}</div>
         <div class="prediction-reason">${data.prediction.reasoning}</div>
-        <div class="confidence">Confidence: ${data.prediction.confidence}/10</div>
+        <div class="confidence">Confidence: ${data.prediction.confidence || 0}/10</div>
       </div>
 
       <!-- Interactive Form (Fallback for non-AMP) -->
@@ -275,14 +275,14 @@ const EmailService = {
         <h2 style="color: #333; font-size: 24px;">📈 Weekly Business Review</h2>
 
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <div style="font-size: 32px; font-weight: bold;">$${data.weekTotal.toLocaleString()}</div>
-          <div style="font-size: 18px; margin-top: 10px;">${data.weekComparison}% vs previous week</div>
+          <div style="font-size: 32px; font-weight: bold;">$${(data.weekTotal || 0).toLocaleString()}</div>
+          <div style="font-size: 18px; margin-top: 10px;">${data.weekComparison || 0}% vs previous week</div>
         </div>
 
         <!-- Significant Changes -->
         <div style="margin: 30px 0;">
           <h3 style="font-size: 18px; color: #333;">🔍 Notable Trends This Week</h3>
-          ${data.significantChanges.map(change => `
+          ${(data.significantChanges || []).map(change => `
             <div style="padding: 15px; background: #f8f9fa; border-left: 4px solid ${change.positive ? '#34A853' : '#EA4335'}; margin: 10px 0;">
               <strong>${change.item}</strong>: ${change.description}
             </div>
@@ -292,8 +292,8 @@ const EmailService = {
         <!-- Weekly Prediction -->
         <div style="background: #fff3cd; padding: 20px; border-radius: 8px; border-left: 4px solid #FFA000;">
           <h3 style="color: #F57C00;">🔮 This Week's Projection</h3>
-          <div style="font-size: 24px; font-weight: bold; color: #333;">Expected: $${data.weeklyPrediction.amount.toLocaleString()}</div>
-          <div style="color: #666; margin-top: 10px;">${data.weeklyPrediction.reasoning}</div>
+          <div style="font-size: 24px; font-weight: bold; color: #333;">Expected: $${(data.weeklyPrediction?.amount || 0).toLocaleString()}</div>
+          <div style="color: #666; margin-top: 10px;">${data.weeklyPrediction?.reasoning || 'Generating projection...'}</div>
         </div>
       </div>
     `;

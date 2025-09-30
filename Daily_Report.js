@@ -11,7 +11,7 @@ const DailyReport = {
    * @param {Date} reportDate The date to generate report for (default: yesterday)
    * @returns {Object} Complete report data
    */
-  async generate(reportDate = null) {
+  generate(reportDate = null) {
     try {
       // Default to yesterday if no date provided
       const targetDate = reportDate || this.getYesterday();
@@ -19,24 +19,20 @@ const DailyReport = {
 
       ErrorHandler.info('DailyReport', `Generating report for ${Config.formatDate(targetDate)}`);
 
-      // Get all data in parallel for performance
-      const [
-        currentDayMetrics,
-        previousWeekMetrics,
-        multiWeekTrend,
-        categoryBreakdown,
-        prediction
-      ] = await Promise.all([
-        this.getDayMetrics(targetDate),
-        this.getDayMetrics(this.getSameDayLastWeek(targetDate)),
-        this.getMultiWeekTrend(targetDate),
-        this.getCategoryBreakdown(targetDate),
-        this.generatePrediction(this.getTomorrow(targetDate))
-      ]);
+      // Get all data (sequential since Apps Script doesn't support async/await)
+      const currentDayMetrics = this.getDayMetrics(targetDate);
+      const previousWeekMetrics = this.getDayMetrics(this.getSameDayLastWeek(targetDate));
+      const multiWeekTrend = this.getMultiWeekTrend(targetDate);
+      const categoryBreakdown = this.getCategoryBreakdown(targetDate);
+      const prediction = this.generatePrediction(this.getTomorrow(targetDate));
+
+      // Ensure we have valid data
+      const totalSales = currentDayMetrics.totalSales || 0;
+      const previousSales = previousWeekMetrics.totalSales || 0;
 
       // Calculate comparison
-      const percentChange = previousWeekMetrics.totalSales > 0
-        ? ((currentDayMetrics.totalSales - previousWeekMetrics.totalSales) / previousWeekMetrics.totalSales * 100)
+      const percentChange = previousSales > 0
+        ? ((totalSales - previousSales) / previousSales * 100)
         : 0;
 
       // Generate trend chart URL
@@ -52,10 +48,10 @@ const DailyReport = {
         date: Config.formatDate(targetDate),
         displayDate: Utilities.formatDate(targetDate, Config.REPORTS.daily.timezone, 'EEEE, MMMM d, yyyy'),
         dayName: dayOfWeek,
-        totalSales: currentDayMetrics.totalSales,
-        transactionCount: currentDayMetrics.transactionCount,
+        totalSales: totalSales,
+        transactionCount: currentDayMetrics.transactionCount || 0,
         percentChange: percentChange,
-        previousWeekSales: previousWeekMetrics.totalSales,
+        previousWeekSales: previousSales,
         contextNote: this.generateContextNote(percentChange, dayOfWeek),
         categories: categoryBreakdown,
         trendChartUrl: trendChartUrl,
@@ -64,7 +60,26 @@ const DailyReport = {
       };
     } catch (error) {
       ErrorHandler.handleError(error, 'DailyReport.generate', { reportDate });
-      throw error;
+      // Return a safe default object
+      return {
+        date: Config.formatDate(reportDate || new Date()),
+        displayDate: Utilities.formatDate(reportDate || new Date(), Config.REPORTS.daily.timezone, 'EEEE, MMMM d, yyyy'),
+        dayName: 'Error',
+        totalSales: 0,
+        transactionCount: 0,
+        percentChange: 0,
+        previousWeekSales: 0,
+        contextNote: 'Error generating report',
+        categories: [],
+        trendChartUrl: '',
+        multiWeekTrend: { values: [], labels: [], dates: [] },
+        prediction: {
+          id: 'ERROR',
+          amount: 0,
+          reasoning: 'Error generating prediction',
+          confidence: 0
+        }
+      };
     }
   },
 
@@ -77,15 +92,26 @@ const DailyReport = {
     const dateStr = Config.formatDate(date);
 
     const query = `
+      WITH SalesData AS (
+        SELECT
+          r.report_id,
+          SUM(CASE WHEN m.metric_name = 'net_sales' THEN m.metric_value ELSE 0 END) as total_sales,
+          SUM(CASE WHEN m.metric_name = 'quantity_sold' THEN m.metric_value ELSE 0 END) as total_items
+        FROM \`${Config.GCP_PROJECT_ID}.${Config.BIGQUERY_DATASET}.${Config.TABLES.reports}\` r
+        LEFT JOIN \`${Config.GCP_PROJECT_ID}.${Config.BIGQUERY_DATASET}.${Config.TABLES.metrics}\` m
+          ON r.report_id = m.report_id
+        WHERE DATE(r.report_date) = @targetDate
+        GROUP BY r.report_id
+      )
       SELECT
-        COUNT(DISTINCT r.report_id) as transaction_count,
-        IFNULL(SUM(m.net_sales), 0) as total_sales,
-        IFNULL(SUM(m.quantity_sold), 0) as total_items,
-        IFNULL(AVG(m.net_sales), 0) as avg_item_price
-      FROM \`${Config.GCP_PROJECT_ID}.${Config.BIGQUERY_DATASET}.${Config.TABLES.reports}\` r
-      LEFT JOIN \`${Config.GCP_PROJECT_ID}.${Config.BIGQUERY_DATASET}.${Config.TABLES.metrics}\` m
-        ON r.report_id = m.report_id
-      WHERE DATE(r.report_date) = @targetDate
+        COUNT(DISTINCT report_id) as transaction_count,
+        IFNULL(SUM(total_sales), 0) as total_sales,
+        IFNULL(SUM(total_items), 0) as total_items,
+        CASE
+          WHEN SUM(total_items) > 0 THEN SUM(total_sales) / SUM(total_items)
+          ELSE 0
+        END as avg_item_price
+      FROM SalesData
     `;
 
     const request = {
@@ -131,22 +157,31 @@ const DailyReport = {
     const dateStr = Config.formatDate(date);
 
     const query = `
-      WITH CategoryItems AS (
+      WITH ItemData AS (
         SELECT
-          m.category,
-          m.item_name,
-          SUM(m.net_sales) as total_sales,
-          SUM(m.quantity_sold) as quantity,
-          ROW_NUMBER() OVER (
-            PARTITION BY m.category
-            ORDER BY SUM(m.net_sales) DESC
-          ) as rank
+          JSON_EXTRACT_SCALAR(m.dimensions, '$.category') as category,
+          JSON_EXTRACT_SCALAR(m.dimensions, '$.item_name') as item_name,
+          MAX(CASE WHEN m.metric_name = 'net_sales' THEN m.metric_value ELSE 0 END) as sales_value,
+          MAX(CASE WHEN m.metric_name = 'quantity_sold' THEN m.metric_value ELSE 0 END) as quantity_value
         FROM \`${Config.GCP_PROJECT_ID}.${Config.BIGQUERY_DATASET}.${Config.TABLES.metrics}\` m
         JOIN \`${Config.GCP_PROJECT_ID}.${Config.BIGQUERY_DATASET}.${Config.TABLES.reports}\` r
           ON m.report_id = r.report_id
         WHERE DATE(r.report_date) = @targetDate
-          AND m.category IN UNNEST(@categories)
-        GROUP BY m.category, m.item_name
+        GROUP BY category, item_name
+      ),
+      CategoryItems AS (
+        SELECT
+          category,
+          item_name,
+          SUM(sales_value) as total_sales,
+          SUM(quantity_value) as quantity,
+          ROW_NUMBER() OVER (
+            PARTITION BY category
+            ORDER BY SUM(sales_value) DESC
+          ) as rank
+        FROM ItemData
+        WHERE category IN UNNEST(@categories)
+        GROUP BY category, item_name
       )
       SELECT
         category,
@@ -176,7 +211,7 @@ const DailyReport = {
         {
           name: 'topN',
           parameterType: { type: 'INT64' },
-          parameterValue: { value: Config.REPORTS.daily.topItemsPerCategory }
+          parameterValue: { value: Config.REPORTS.daily.topItemsPerCategory.toString() }
         }
       ]
     };
@@ -241,7 +276,7 @@ const DailyReport = {
     const query = `
       SELECT
         DATE(r.report_date) as sale_date,
-        IFNULL(SUM(m.net_sales), 0) as total_sales
+        IFNULL(SUM(CASE WHEN m.metric_name = 'net_sales' THEN m.metric_value ELSE 0 END), 0) as total_sales
       FROM \`${Config.GCP_PROJECT_ID}.${Config.BIGQUERY_DATASET}.${Config.TABLES.reports}\` r
       LEFT JOIN \`${Config.GCP_PROJECT_ID}.${Config.BIGQUERY_DATASET}.${Config.TABLES.metrics}\` m
         ON r.report_id = m.report_id
@@ -307,7 +342,7 @@ const DailyReport = {
         SELECT
           DATE(r.report_date) as sale_date,
           EXTRACT(DAYOFWEEK FROM r.report_date) as day_of_week,
-          SUM(m.net_sales) as total_sales
+          SUM(CASE WHEN m.metric_name = 'net_sales' THEN m.metric_value ELSE 0 END) as total_sales
         FROM \`${Config.GCP_PROJECT_ID}.${Config.BIGQUERY_DATASET}.${Config.TABLES.reports}\` r
         JOIN \`${Config.GCP_PROJECT_ID}.${Config.BIGQUERY_DATASET}.${Config.TABLES.metrics}\` m
           ON r.report_id = m.report_id
@@ -347,33 +382,37 @@ const DailyReport = {
         const stdDev = parseFloat(row.f[1].v || 0);
         const sampleSize = parseInt(row.f[2].v || 0);
 
-        // Simple prediction based on average with some variance
-        const predictedAmount = Math.round(avgSales);
+        // Check if we have valid data
+        if (avgSales > 0 && sampleSize > 0) {
+          // Simple prediction based on average with some variance
+          const predictedAmount = Math.round(avgSales);
 
-        // Calculate confidence based on sample size and variance
-        const confidence = Math.min(10, Math.max(1,
-          Math.round(10 * (sampleSize / 20) * (1 - (stdDev / avgSales)))
-        ));
+          // Calculate confidence based on sample size and variance
+          const confidenceRatio = stdDev > 0 ? (1 - Math.min(stdDev / avgSales, 1)) : 1;
+          const confidence = Math.min(10, Math.max(1,
+            Math.round(10 * Math.min(sampleSize / 20, 1) * confidenceRatio)
+          ));
 
-        // Generate unique prediction ID
-        const predictionId = `PRED-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          // Generate unique prediction ID
+          const predictionId = `PRED-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-        // Create reasoning
-        const reasoning = `Based on ${sampleSize} ${dayOfWeek}s from the past 90 days, ` +
-          `with average sales of $${avgSales.toFixed(2)} and ` +
-          `typical variation of ±$${stdDev.toFixed(2)}`;
+          // Create reasoning
+          const reasoning = `Based on ${sampleSize} ${dayOfWeek}s from the past 90 days, ` +
+            `with average sales of $${avgSales.toFixed(2)} and ` +
+            `typical variation of ±$${stdDev.toFixed(2)}`;
 
-        // Store prediction for tracking
-        this.storePrediction(predictionId, targetDate, predictedAmount, confidence, reasoning);
+          // Store prediction for tracking
+          this.storePrediction(predictionId, targetDate, predictedAmount, confidence, reasoning);
 
-        return {
-          id: predictionId,
-          amount: predictedAmount,
-          reasoning: reasoning,
-          confidence: confidence,
-          historicalAvg: avgSales,
-          sampleSize: sampleSize
-        };
+          return {
+            id: predictionId,
+            amount: predictedAmount,
+            reasoning: reasoning,
+            confidence: confidence,
+            historicalAvg: avgSales,
+            sampleSize: sampleSize
+          };
+        }
       }
 
       // Fallback if no historical data
