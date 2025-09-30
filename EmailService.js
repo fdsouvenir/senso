@@ -198,9 +198,14 @@ const EmailService = {
       <!-- Prediction -->
       <div class="prediction-box">
         <div class="prediction-title">Tomorrow's Forecast</div>
-        <div class="prediction-value">Prediction #${data.prediction.id}: $${(data.prediction.amount || 0).toLocaleString()}</div>
+        <div class="prediction-value">Prediction #${data.prediction.id}: <strong>$${(data.prediction.amount || 0).toLocaleString()}</strong></div>
         <div class="prediction-reason">${data.prediction.reasoning}</div>
-        <div class="confidence">Confidence: ${data.prediction.confidence || 0}/10</div>
+        <div class="confidence">
+          Confidence: ${data.prediction.confidence || 0}/10
+          ${data.prediction.confidence <= 3 ? ' (Low - high variance in historical data)' :
+            data.prediction.confidence <= 6 ? ' (Moderate)' :
+            ' (High - consistent historical pattern)'}
+        </div>
       </div>
 
       <!-- Interactive Form (Fallback for non-AMP) -->

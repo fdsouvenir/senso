@@ -388,18 +388,27 @@ const DailyReport = {
           const predictedAmount = Math.round(avgSales);
 
           // Calculate confidence based on sample size and variance
-          const confidenceRatio = stdDev > 0 ? (1 - Math.min(stdDev / avgSales, 1)) : 1;
+          // Lower confidence when standard deviation is high relative to average
+          const varianceRatio = stdDev / avgSales;  // How much variation as % of average
+          const sampleRatio = Math.min(sampleSize / 20, 1);  // More samples = more confident
+
+          // High variance should significantly reduce confidence
+          // If stdDev is 30% of average, confidence should be lower
+          const confidenceRatio = Math.max(0.1, 1 - (varianceRatio * 1.5));
           const confidence = Math.min(10, Math.max(1,
-            Math.round(10 * Math.min(sampleSize / 20, 1) * confidenceRatio)
+            Math.round(10 * sampleRatio * confidenceRatio)
           ));
 
-          // Generate unique prediction ID
-          const predictionId = `PRED-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          // Generate shorter, more readable prediction ID
+          const timestamp = new Date().getTime().toString(36).toUpperCase();
+          const random = Math.random().toString(36).substr(2, 5).toUpperCase();
+          const predictionId = `${timestamp}-${random}`;
 
-          // Create reasoning
+          // Create reasoning with HTML entity for plus-minus symbol
+          const variationPercent = ((stdDev / avgSales) * 100).toFixed(0);
           const reasoning = `Based on ${sampleSize} ${dayOfWeek}s from the past 90 days, ` +
             `with average sales of $${avgSales.toFixed(2)} and ` +
-            `typical variation of ±$${stdDev.toFixed(2)}`;
+            `typical variation of &plusmn;$${stdDev.toFixed(2)} (${variationPercent}%)`;
 
           // Store prediction for tracking
           this.storePrediction(predictionId, targetDate, predictedAmount, confidence, reasoning);
