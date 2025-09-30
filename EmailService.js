@@ -222,43 +222,188 @@ const EmailService = {
    * @returns {string} HTML content
    */
   buildWeeklyReportHtml(data) {
-    // Extend daily report with weekly sections
-    let html = this.buildDailyReportHtml(data.sundayData);
-
     // Escape HTML in all user data
     const esc = SecurityUtils.escapeHtml;
 
-    // Add weekly special section
-    const weeklySection = `
-      <div style="border-top: 3px solid #4285F4; margin-top: 40px; padding-top: 30px;">
-        <h2 style="color: #333; font-size: 24px;">📈 Weekly Business Review</h2>
+    // Calculate key metrics
+    const weekChange = parseFloat(data.weekComparison || 0);
+    const weekChangeColor = weekChange >= 0 ? '#16a34a' : '#dc2626';
+    const weekChangeSymbol = weekChange >= 0 ? '↑' : '↓';
 
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <div style="font-size: 32px; font-weight: bold;">$${(data.weekTotal || 0).toLocaleString()}</div>
-          <div style="font-size: 18px; margin-top: 10px;">${data.weekComparison || 0}% vs previous week</div>
+    // Build executive-focused weekly report
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background: #f9fafb; }
+    .container { max-width: 600px; margin: 0 auto; background: white; }
+
+    /* Executive Summary */
+    .executive-summary { background: #1e3a5f; color: white; padding: 24px; }
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 16px; }
+    .metric-block { text-align: center; }
+    .metric-label { font-size: 11px; text-transform: uppercase; opacity: 0.8; margin-bottom: 4px; }
+    .metric-value { font-size: 28px; font-weight: bold; line-height: 1; }
+    .metric-change { font-size: 14px; margin-top: 4px; }
+    .positive { color: #4ade80; }
+    .negative { color: #f87171; }
+    .neutral { color: #fbbf24; }
+
+    /* Key Insight */
+    .key-insight { background: #f0f9ff; border-left: 4px solid #0891b2; padding: 16px; margin: 20px; }
+    .insight-title { font-size: 12px; text-transform: uppercase; color: #0891b2; margin-bottom: 4px; }
+    .insight-text { font-size: 16px; color: #1e40af; }
+
+    /* Content sections */
+    .content { padding: 20px; }
+    .section { margin-bottom: 24px; }
+    .section-title { font-size: 14px; font-weight: 600; color: #374151; text-transform: uppercase; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
+
+    /* Data tables */
+    .data-table { width: 100%; }
+    .data-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+    .data-label { color: #374151; flex: 1; }
+    .data-value { color: #111827; font-weight: 600; text-align: right; }
+    .data-change { font-size: 13px; color: #6b7280; }
+
+    /* Charts */
+    .chart-container { background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0; text-align: center; }
+    .chart-title { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+
+    /* Forecast */
+    .forecast-box { background: #fef3c7; border-radius: 8px; padding: 16px; margin: 20px; }
+    .forecast-label { font-size: 12px; color: #92400e; text-transform: uppercase; margin-bottom: 4px; }
+    .forecast-value { font-size: 24px; font-weight: bold; color: #451a03; }
+    .forecast-detail { font-size: 13px; color: #78350f; margin-top: 4px; }
+
+    /* Footer */
+    .footer { background: #f9fafb; padding: 16px; text-align: center; color: #6b7280; font-size: 11px; border-top: 1px solid #e5e7eb; }
+
+    /* Mobile responsiveness */
+    @media (max-width: 480px) {
+      .summary-grid { grid-template-columns: 1fr; gap: 16px; }
+      .metric-value { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Executive Summary -->
+    <div class="executive-summary">
+      <div class="summary-grid">
+        <div class="metric-block">
+          <div class="metric-label">Week Total</div>
+          <div class="metric-value">$${(data.weekTotal || 0).toLocaleString()}</div>
+          <div class="metric-change ${weekChange >= 0 ? 'positive' : 'negative'}">
+            ${weekChangeSymbol} ${Math.abs(weekChange).toFixed(0)}%
+          </div>
         </div>
+        <div class="metric-block">
+          <div class="metric-label">Daily Average</div>
+          <div class="metric-value">$${((data.weekTotal || 0) / 7).toFixed(0).toLocaleString()}</div>
+          <div class="metric-change neutral">7-day avg</div>
+        </div>
+        <div class="metric-block">
+          <div class="metric-label">Best Day</div>
+          <div class="metric-value">${esc(data.bestDay || 'N/A')}</div>
+          <div class="metric-change neutral">${esc(data.sundayData?.dayName || '')}</div>
+        </div>
+      </div>
+      <div style="text-align: center; font-size: 14px; opacity: 0.9;">
+        Week of ${esc(data.weekStartDate)} - ${esc(data.weekEndDate)}
+      </div>
+    </div>
 
-        <!-- Significant Changes -->
-        <div style="margin: 30px 0;">
-          <h3 style="font-size: 18px; color: #333;">🔍 Notable Trends This Week</h3>
-          ${(data.significantChanges || []).map(change => `
-            <div style="padding: 15px; background: #f8f9fa; border-left: 4px solid ${change.positive ? '#34A853' : '#EA4335'}; margin: 10px 0;">
-              <strong>${esc(change.item)}</strong>: ${esc(change.description)}
+    <!-- Key Insight -->
+    <div class="key-insight">
+      <div class="insight-title">Key Insight</div>
+      <div class="insight-text">
+        ${weekChange > 20 ? 'Strong week with significant growth across multiple categories.' :
+          weekChange > 0 ? 'Steady performance with moderate growth compared to last week.' :
+          weekChange > -10 ? 'Slight decline but within normal variance range.' :
+          'Notable decline requiring attention - review category performance below.'}
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Top Categories -->
+      <div class="section">
+        <div class="section-title">Top Performing Categories</div>
+        ${(data.categoryPerformance || []).slice(0, 3).map(cat => `
+          <div class="data-row">
+            <span class="data-label">${esc(cat.category)}</span>
+            <span>
+              <span class="data-value">$${(cat.currentSales || 0).toFixed(0).toLocaleString()}</span>
+              <span class="data-change ${cat.changePercent >= 0 ? 'positive' : 'negative'}" style="margin-left: 8px;">
+                ${cat.changePercent >= 0 ? '+' : ''}${cat.changePercent.toFixed(0)}%
+              </span>
+            </span>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Notable Changes (Top 3 only) -->
+      ${data.significantChanges && data.significantChanges.length > 0 ? `
+        <div class="section">
+          <div class="section-title">Notable Changes</div>
+          ${data.significantChanges.slice(0, 3).map(change => `
+            <div class="data-row">
+              <span class="data-label">${esc(change.item)}</span>
+              <span class="data-value ${change.positive ? 'positive' : 'negative'}">
+                ${esc(change.description)}
+              </span>
             </div>
           `).join('')}
         </div>
+      ` : ''}
 
-        <!-- Weekly Prediction -->
-        <div style="background: #fff3cd; padding: 20px; border-radius: 8px; border-left: 4px solid #FFA000;">
-          <h3 style="color: #F57C00;">🔮 This Week's Projection</h3>
-          <div style="font-size: 24px; font-weight: bold; color: #333;">Expected: $${(data.weeklyPrediction?.amount || 0).toLocaleString()}</div>
-          <div style="color: #666; margin-top: 10px;">${esc(data.weeklyPrediction?.reasoning || 'Generating projection...')}</div>
+      <!-- Sunday Performance -->
+      <div class="section">
+        <div class="section-title">Yesterday's Performance</div>
+        <div class="data-row">
+          <span class="data-label">Total Sales</span>
+          <span class="data-value">$${(data.sundayData?.totalSales || 0).toLocaleString()}</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">vs Last ${esc(data.sundayData?.dayName || 'Sunday')}</span>
+          <span class="data-value ${data.sundayData?.percentChange >= 0 ? 'positive' : 'negative'}">
+            ${data.sundayData?.percentChange >= 0 ? '+' : ''}${(data.sundayData?.percentChange || 0).toFixed(1)}%
+          </span>
         </div>
       </div>
+
+      <!-- Week Trend Chart -->
+      ${data.sundayData?.trendChartUrl ? `
+        <div class="chart-container">
+          <div class="chart-title">3-Week Trend</div>
+          <img src="${esc(data.sundayData.trendChartUrl)}" alt="Weekly trend" style="max-width: 100%; height: auto;">
+        </div>
+      ` : ''}
+    </div>
+
+    <!-- Forecast -->
+    <div class="forecast-box">
+      <div class="forecast-label">This Week's Projection</div>
+      <div class="forecast-value">$${(data.weeklyPrediction?.amount || 0).toLocaleString()}</div>
+      <div class="forecast-detail">
+        ${data.weeklyPrediction?.confidence >= 7 ? 'High confidence' :
+          data.weeklyPrediction?.confidence >= 4 ? 'Moderate confidence' :
+          'Variable historical pattern'}
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Senso Analytics - Weekly Executive Summary</p>
+      <p>Full details available at dashboard.sensosushi.com</p>
+    </div>
+  </div>
+</body>
+</html>
     `;
 
-    // Insert weekly section before the footer
-    html = html.replace('<div class="footer">', weeklySection + '<div class="footer">');
     return html;
   },
 
