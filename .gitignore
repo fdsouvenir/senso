@@ -30,3 +30,21 @@ logs/
 *-key.json
 credentials.json
 token.json
+Variables.js
+Variables*.js
+**/Variables.js
+**/Variables*.js
+
+# API Keys and Secrets
+*.key
+*.pem
+*.p12
+*_api_key*
+*_API_KEY*
+secrets.js
+Secrets.js
+config.secret.js
+
+# Service Account files
+service-account*.json
+serviceaccount*.json
