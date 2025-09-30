@@ -66,4 +66,13 @@ Gmail → GmailHarvester.js → Drive Storage
 - OAuth2 library: `1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF`
 - BigQuery Advanced Service v2
 - Google Gemini API (external)
-- when deploying push to github and to clasp
+
+### Deployment Note
+When deploying changes, always push to both GitHub and Google Apps Script:
+```bash
+git push origin main && clasp push
+```
+
+### Important Guidelines
+- Avoid using test or sample data - always use real data from BigQuery
+- Frontend reports should query actual restaurant metrics

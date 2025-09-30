@@ -279,59 +279,47 @@ function configureFrontendSettings() {
 function sendTestDailyReport() {
   try {
     const ui = SpreadsheetApp.getUi();
-    ui.alert('Sending Test Report', 'A test daily report will be sent to your email address.', ui.ButtonSet.OK);
 
-    // TODO: Implement actual daily report generation
-    // For now, send a sample report
-    const testData = {
-      date: Config.formatDate(new Date()),
-      displayDate: Utilities.formatDate(new Date(), Config.REPORTS.daily.timezone, 'EEEE, MMMM d, yyyy'),
-      dayName: Utilities.formatDate(new Date(), Config.REPORTS.daily.timezone, 'EEEE'),
-      totalSales: 5432.10,
-      percentChange: 12.5,
-      contextNote: 'This is a test report with sample data',
-      categories: [
-        {
-          name: 'Signature Rolls',
-          items: [
-            { name: 'Rainbow Roll', sales: 420, quantity: 12 },
-            { name: 'Dragon Roll', sales: 380, quantity: 10 },
-            { name: 'Spider Roll', sales: 340, quantity: 9 }
-          ]
-        },
-        {
-          name: 'Wine',
-          items: [
-            { name: 'Pinot Grigio', sales: 180, quantity: 6 },
-            { name: 'Chardonnay', sales: 150, quantity: 5 },
-            { name: 'Merlot', sales: 120, quantity: 4 }
-          ]
-        }
-      ],
-      trendChartUrl: ChartGenerator.generateLineChart(
-        [100, 110, 125, 115, 130, 125, 140],
-        'Sales Trend',
-        600, 300,
-        null,
-        ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Today']
-      ),
-      prediction: {
-        id: 'TEST-001',
-        amount: 5890,
-        reasoning: 'Based on recent trends and typical weekend patterns',
-        confidence: 8
+    // Ask user which date to generate report for
+    const response = ui.prompt(
+      'Generate Daily Report',
+      'Enter date for report (YYYY-MM-DD) or leave blank for yesterday:',
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (response.getSelectedButton() !== ui.Button.OK) {
+      return;
+    }
+
+    let reportDate;
+    if (response.getResponseText()) {
+      reportDate = new Date(response.getResponseText());
+      if (isNaN(reportDate.getTime())) {
+        ui.alert('Invalid Date', 'Please enter a valid date in YYYY-MM-DD format.', ui.ButtonSet.OK);
+        return;
       }
-    };
+    } else {
+      // Default to yesterday
+      reportDate = new Date();
+      reportDate.setDate(reportDate.getDate() - 1);
+    }
 
-    const success = EmailService.sendDailyReport(testData);
+    ui.alert('Generating Report', `Generating daily report for ${Config.formatDate(reportDate)}. This may take a moment...`, ui.ButtonSet.OK);
+
+    // Generate report with real data
+    const reportData = DailyReport.generate(reportDate);
+
+    // Send the report
+    const success = EmailService.sendDailyReport(reportData);
 
     if (success) {
-      ui.alert('Success', 'Test daily report has been sent to your email.', ui.ButtonSet.OK);
+      ui.alert('Success', `Daily report for ${Config.formatDate(reportDate)} has been sent to your email.`, ui.ButtonSet.OK);
     } else {
-      ui.alert('Error', 'Failed to send test report. Check logs for details.', ui.ButtonSet.OK);
+      ui.alert('Error', 'Failed to send report. Check logs for details.', ui.ButtonSet.OK);
     }
   } catch (error) {
     ErrorHandler.handleError(error, 'sendTestDailyReport', {}, true);
+    SpreadsheetApp.getUi().alert('Error', `Failed to generate report: ${error.toString()}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
@@ -475,4 +463,54 @@ function showAbout() {
     '© 2024 Senso Analytics';
 
   ui.alert('About Senso Analytics', message, ui.ButtonSet.OK);
+}
+
+/**
+ * Automated daily report generation (triggered by schedule)
+ */
+function generateDailyReport() {
+  try {
+    ErrorHandler.info('DailyReport', 'Starting automated daily report generation');
+
+    // Check if it's a day we should send reports
+    const today = new Date();
+    const dayName = Utilities.formatDate(today, Config.REPORTS.daily.timezone, 'EEEE');
+
+    if (!Config.REPORTS.daily.daysActive.includes(dayName)) {
+      ErrorHandler.info('DailyReport', `Skipping report for ${dayName} (not in active days)`);
+      return;
+    }
+
+    // Generate report for yesterday
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const reportData = DailyReport.generate(yesterday);
+
+    // Send the report
+    const success = EmailService.sendDailyReport(reportData);
+
+    if (success) {
+      ErrorHandler.info('DailyReport', `Daily report sent successfully for ${Config.formatDate(yesterday)}`);
+    } else {
+      ErrorHandler.error('DailyReport', 'Failed to send daily report');
+    }
+  } catch (error) {
+    ErrorHandler.handleError(error, 'generateDailyReport', {}, true);
+  }
+}
+
+/**
+ * Automated weekly report generation (triggered by schedule)
+ */
+function generateWeeklyReport() {
+  try {
+    ErrorHandler.info('WeeklyReport', 'Starting automated weekly report generation');
+
+    // TODO: Implement weekly report generation
+    // This will be implemented in the next phase
+    ErrorHandler.info('WeeklyReport', 'Weekly report generation not yet implemented');
+  } catch (error) {
+    ErrorHandler.handleError(error, 'generateWeeklyReport', {}, true);
+  }
 }
