@@ -40,7 +40,9 @@ function onOpen() {
     .addSeparator()
     .addItem('Send Test Daily Report', 'sendTestDailyReport')
     .addItem('Send Test Weekly Report', 'sendTestWeeklyReport')
-    .addItem('Test Chart Generation', 'testChartGeneration');
+    .addItem('Test Chart Generation', 'testChartGeneration')
+    .addSeparator()
+    .addItem('🌐 Configure Web App', 'configureWebApp');
 
   // Trigger management submenu
   const triggerMenu = ui.createMenu('⏰ Automated Triggers');
@@ -753,6 +755,62 @@ function configureFrontendSettings() {
         ui.ButtonSet.OK);
     }
   }
+}
+
+/**
+ * Configure Web App deployment settings
+ */
+function configureWebApp() {
+  const ui = SpreadsheetApp.getUi();
+
+  const html = `
+    <div style="padding: 20px; font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>🌐 Configure Web App for Q&A Form</h2>
+      <p><strong>Current Web App URL:</strong></p>
+      <p style="background: #f5f5f5; padding: 10px; border-radius: 4px; word-break: break-all; font-size: 12px;">
+        ${Config.WEB_APP.url}
+      </p>
+
+      <h3>⚠️ Required Setup Steps:</h3>
+      <ol>
+        <li><strong>Deploy as Web App:</strong>
+          <ul>
+            <li>Click "Deploy" → "Manage deployments" in the Google Apps Script editor</li>
+            <li>Click "Edit" on the deployment</li>
+          </ul>
+        </li>
+        <li><strong>Configure Settings:</strong>
+          <ul>
+            <li><strong>Execute as:</strong> Me (your email)</li>
+            <li><strong>Who has access:</strong> Anyone</li>
+          </ul>
+        </li>
+        <li><strong>Update & Save:</strong>
+          <ul>
+            <li>Click "Deploy" button</li>
+            <li>Copy the new Web App URL if it changes</li>
+          </ul>
+        </li>
+      </ol>
+
+      <h3>📝 Test the Form:</h3>
+      <p>After configuration, you can test the form by:</p>
+      <ul>
+        <li>Sending a test weekly report and clicking the question form</li>
+        <li>Or visiting the URL directly</li>
+      </ul>
+
+      <p style="background: #fff3cd; padding: 10px; border-left: 4px solid #ffc107; margin-top: 20px;">
+        <strong>Note:</strong> If you see a "Page Not Found" error, the web app needs to be reconfigured with proper permissions.
+      </p>
+    </div>
+  `;
+
+  const htmlOutput = HtmlService.createHtmlOutput(html)
+    .setWidth(600)
+    .setHeight(500);
+
+  ui.showModalDialog(htmlOutput, 'Web App Configuration');
 }
 
 /**
