@@ -15,7 +15,7 @@ const Config = {
   // Email Configuration
   EMAIL: {
     SENDER_NAME: 'Senso Analytics',
-    REPLY_TO: 'noreply@senso-analytics.com',
+    REPLY_TO: 'noreply@sensosushi.com',
     SUBJECT_PREFIX: '📊 Senso',
     MAX_RETRIES: 3
   },
