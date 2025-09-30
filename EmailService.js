@@ -6,7 +6,7 @@
 
 const EmailService = {
   /**
-   * Send an email
+   * Send an email using Gmail API or fallback to MailApp
    * @param {Object} options Email options
    * @returns {boolean} Success status
    */
@@ -15,14 +15,41 @@ const EmailService = {
       recipient = Session.getActiveUser().getEmail(),
       subject,
       htmlBody,
+      ampBody = null,
       textBody = null,
       attachments = [],
       replyTo = Config.EMAIL.REPLY_TO,
-      name = Config.EMAIL.SENDER_NAME
+      name = Config.EMAIL.SENDER_NAME,
+      useGmailApi = true  // Try Gmail API first
     } = options;
 
     try {
-      // Build email options
+      // Attempt to send via Gmail API if enabled
+      if (useGmailApi && ampBody) {
+        try {
+          const success = GmailService.sendEmail({
+            recipient: recipient,
+            subject: `${Config.EMAIL.SUBJECT_PREFIX} ${subject}`,
+            htmlBody: htmlBody,
+            ampBody: ampBody,
+            textBody: textBody,
+            attachments: attachments,
+            senderEmail: 'reports@sensosushi.com',
+            senderName: name
+          });
+
+          if (success) {
+            // Log engagement
+            this.logEmailSent(recipient, subject, 'amp');
+            Logger.log('Email sent successfully via Gmail API with AMP content');
+            return true;
+          }
+        } catch (gmailError) {
+          Logger.log(`Gmail API failed, falling back to MailApp: ${gmailError.toString()}`);
+        }
+      }
+
+      // Fallback to MailApp (no AMP support)
       const mailOptions = {
         to: recipient,
         subject: `${Config.EMAIL.SUBJECT_PREFIX} ${subject}`,
@@ -41,6 +68,7 @@ const EmailService = {
 
       // Log engagement
       this.logEmailSent(recipient, subject, 'html');
+      Logger.log('Email sent successfully via MailApp (HTML only)');
 
       return true;
     } catch (error) {
@@ -51,7 +79,7 @@ const EmailService = {
 
 
   /**
-   * Send daily report email
+   * Send daily report email with AMP support
    * @param {Object} reportData Report data
    * @returns {boolean} Success status
    */
@@ -59,16 +87,18 @@ const EmailService = {
     const recipient = PropertiesService.getScriptProperties().getProperty('REPORT_RECIPIENT') || Session.getActiveUser().getEmail();
     const subject = `Daily Report - ${SecurityUtils.escapeHtml(reportData.date)}`;
     const htmlBody = this.buildDailyReportHtml(reportData, recipient);
+    const ampBody = this.buildDailyReportAmp(reportData, recipient);
 
     return this.sendEmail({
       recipient: recipient,
       subject: subject,
-      htmlBody: htmlBody
+      htmlBody: htmlBody,
+      ampBody: ampBody  // Include AMP version for Gmail
     });
   },
 
   /**
-   * Send weekly roll-up email
+   * Send weekly roll-up email with AMP support
    * @param {Object} reportData Report data
    * @returns {boolean} Success status
    */
@@ -76,11 +106,13 @@ const EmailService = {
     const recipient = PropertiesService.getScriptProperties().getProperty('REPORT_RECIPIENT') || Session.getActiveUser().getEmail();
     const subject = `Weekly Roll-Up - Week of ${SecurityUtils.escapeHtml(reportData.weekStartDate)}`;
     const htmlBody = this.buildWeeklyReportHtml(reportData, recipient);
+    const ampBody = this.buildWeeklyReportAmp(reportData, recipient);
 
     return this.sendEmail({
       recipient: recipient,
       subject: subject,
-      htmlBody: htmlBody
+      htmlBody: htmlBody,
+      ampBody: ampBody  // Include AMP version for Gmail
     });
   },
 
@@ -517,6 +549,275 @@ const EmailService = {
     } catch (error) {
       Logger.log(`Failed to log email engagement: ${error.toString()}`);
     }
+  },
+
+  /**
+   * Build AMP HTML for daily report
+   * @param {Object} data Report data
+   * @param {string} recipientEmail Email address of recipient
+   * @returns {string} AMP HTML content
+   */
+  buildDailyReportAmp(data, recipientEmail = '') {
+    const esc = SecurityUtils.escapeHtml;
+    const changeColor = data.percentChange >= 0 ? '#34A853' : '#EA4335';
+    const changeSymbol = data.percentChange >= 0 ? '↑' : '↓';
+
+    return `<!doctype html>
+<html ⚡4email>
+<head>
+  <meta charset="utf-8">
+  <script async src="https://cdn.ampproject.org/v0.js"></script>
+  <script async custom-element="amp-form" src="https://cdn.ampproject.org/v0/amp-form-0.1.js"></script>
+  <script async custom-template="amp-mustache" src="https://cdn.ampproject.org/v0/amp-mustache-0.2.js"></script>
+  <style amp4email-boilerplate>body{visibility:hidden}</style>
+  <style amp-custom>
+    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background: white; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 24px; }
+    .date { opacity: 0.9; margin-top: 5px; }
+    .content { padding: 20px; }
+    .metric-card { background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid ${changeColor}; }
+    .metric-value { font-size: 32px; font-weight: bold; color: ${changeColor}; }
+    .metric-label { color: #666; margin-top: 5px; }
+    .comparison { color: ${changeColor}; font-size: 18px; margin-top: 10px; }
+    .category-section { margin: 30px 0; }
+    .category-title { font-size: 18px; font-weight: bold; color: #333; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; }
+    .item-table { width: 100%; margin-top: 15px; border-collapse: collapse; }
+    .item-table tr { border-bottom: 1px solid #e0e0e0; }
+    .item-table td { padding: 10px 0; }
+    .item-rank { color: #666; font-weight: bold; width: 30px; }
+    .item-name { color: #333; }
+    .item-sales { text-align: right; font-weight: bold; color: #333; }
+    .amp-form-container { background: #f5f5f5; padding: 20px; margin-top: 30px; border-radius: 8px; }
+    .form-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; color: #333; }
+    .text-input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+    .submit-btn { background: #4285F4; color: white; padding: 12px 24px; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 10px; width: 100%; }
+    .submit-btn:hover { background: #3574e2; }
+    .success-message { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 12px; border-radius: 4px; margin-top: 10px; }
+    .error-message { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 12px; border-radius: 4px; margin-top: 10px; }
+    .footer { background: #f5f5f5; padding: 20px; text-align: center; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📊 Daily Sales Report</h1>
+      <div class="date">${esc(data.displayDate)}</div>
+    </div>
+
+    <div class="content">
+      <!-- Key Metrics -->
+      <div class="metric-card">
+        <div class="metric-value">$${(data.totalSales || 0).toLocaleString()}</div>
+        <div class="metric-label">${esc(data.dayName)} Total Sales</div>
+        <div class="comparison">
+          ${changeSymbol} ${Math.abs(data.percentChange || 0).toFixed(1)}% vs last ${esc(data.dayName)}
+        </div>
+      </div>
+
+      <!-- Top Categories Summary -->
+      ${(data.categories || []).slice(0, 3).map(category => `
+        <div class="category-section">
+          <div class="category-title">${esc(category.name)}</div>
+          <table class="item-table">
+            ${(category.items || []).slice(0, 3).map((item, index) => `
+              <tr>
+                <td class="item-rank">${index + 1}</td>
+                <td class="item-name">${esc(item.name)}</td>
+                <td class="item-sales">$${(item.sales || 0).toLocaleString()}</td>
+              </tr>
+            `).join('')}
+          </table>
+        </div>
+      `).join('')}
+
+      <!-- Interactive AMP Form -->
+      <div class="amp-form-container">
+        <div class="form-title">Ask a Question About Your Data</div>
+        <amp-form method="post"
+          action-xhr="${Config.WEB_APP.url}"
+          custom-validation-reporting="as-you-go">
+
+          <fieldset>
+            <input type="text"
+              name="question"
+              class="text-input"
+              placeholder="e.g., Show me wine sales from last week"
+              required>
+            <input type="hidden" name="email" value="${esc(recipientEmail)}">
+            <input type="hidden" name="source" value="amp_daily">
+            <input type="hidden" name="amp" value="true">
+            <span visible-when-invalid="valueMissing" validation-for="question">
+              Please enter a question
+            </span>
+          </fieldset>
+
+          <input type="submit" value="Get Report" class="submit-btn">
+
+          <div submit-success>
+            <template type="amp-mustache">
+              <div class="success-message">
+                ✅ Success! Your report is being generated and will be sent to your email.
+              </div>
+            </template>
+          </div>
+
+          <div submit-error>
+            <template type="amp-mustache">
+              <div class="error-message">
+                ❌ Unable to process your request. Please try again or reply to this email.
+              </div>
+            </template>
+          </div>
+        </amp-form>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Senso Analytics | Powered by AI</p>
+      <p>Reply to this email with questions or feedback</p>
+    </div>
+  </div>
+</body>
+</html>`;
+  },
+
+  /**
+   * Build AMP HTML for weekly report
+   * @param {Object} data Report data
+   * @param {string} recipientEmail Email address of recipient
+   * @returns {string} AMP HTML content
+   */
+  buildWeeklyReportAmp(data, recipientEmail = '') {
+    const esc = SecurityUtils.escapeHtml;
+
+    // Format dates with ordinals
+    const formatDateWithOrdinal = (dateStr) => {
+      const date = new Date(dateStr);
+      const day = date.getDate();
+      const suffix = ['th', 'st', 'nd', 'rd'][day % 10 > 3 ? 0 : (day % 100 - day % 10 !== 10) * day % 10];
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      return `${monthNames[date.getMonth()]} ${day}${suffix}`;
+    };
+
+    const weekChange = parseFloat(data.weekComparison || 0);
+    const weekChangeColor = weekChange >= 0 ? '#16a34a' : '#dc2626';
+    const weekChangeSymbol = weekChange >= 0 ? '↑' : '↓';
+
+    return `<!doctype html>
+<html ⚡4email>
+<head>
+  <meta charset="utf-8">
+  <script async src="https://cdn.ampproject.org/v0.js"></script>
+  <script async custom-element="amp-form" src="https://cdn.ampproject.org/v0/amp-form-0.1.js"></script>
+  <script async custom-template="amp-mustache" src="https://cdn.ampproject.org/v0/amp-mustache-0.2.js"></script>
+  <style amp4email-boilerplate>body{visibility:hidden}</style>
+  <style amp-custom>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background: #f9fafb; }
+    .container { max-width: 600px; margin: 0 auto; background: white; }
+    .executive-summary { background: #1e3a5f; color: white; padding: 24px; }
+    .week-header { text-align: center; margin-bottom: 20px; }
+    .week-dates { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
+    .summary-grid { display: flex; justify-content: space-around; margin-top: 20px; }
+    .metric-block { text-align: center; }
+    .metric-label { font-size: 11px; text-transform: uppercase; opacity: 0.8; margin-bottom: 4px; }
+    .metric-value { font-size: 28px; font-weight: bold; }
+    .metric-change { font-size: 13px; margin-top: 4px; color: ${weekChangeColor}; }
+    .content { padding: 20px; }
+    .section { margin-bottom: 24px; }
+    .section-title { font-size: 14px; font-weight: 600; color: #374151; text-transform: uppercase; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
+    .amp-form-container { background: #f5f5f5; padding: 20px; margin: 20px; border-radius: 8px; }
+    .form-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; color: #333; }
+    .text-input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+    .submit-btn { background: #4285F4; color: white; padding: 12px 24px; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 10px; width: 100%; }
+    .success-message { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 12px; border-radius: 4px; margin-top: 10px; }
+    .error-message { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 12px; border-radius: 4px; margin-top: 10px; }
+    .footer { background: #f9fafb; padding: 16px; text-align: center; color: #6b7280; font-size: 11px; border-top: 1px solid #e5e7eb; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="executive-summary">
+      <div class="week-header">
+        <div class="week-dates">Week of ${formatDateWithOrdinal(data.weekStartDate)} to ${formatDateWithOrdinal(data.weekEndDate)}</div>
+      </div>
+      <div class="summary-grid">
+        <div class="metric-block">
+          <div class="metric-label">Total Sales</div>
+          <div class="metric-value">$${(data.weekTotal || 0).toLocaleString()}</div>
+          <div class="metric-change">${weekChangeSymbol} ${Math.abs(weekChange).toFixed(0)}% vs last week</div>
+        </div>
+        <div class="metric-block">
+          <div class="metric-label">Best Day</div>
+          <div class="metric-value">${esc(data.bestDay || 'N/A')}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Category Performance Summary -->
+      <div class="section">
+        <div class="section-title">Top Categories This Week</div>
+        ${(data.categoryPerformance || []).slice(0, 5).map(cat => `
+          <div style="padding: 8px 0; border-bottom: 1px solid #f3f4f6;">
+            <span style="color: #374151;">${esc(cat.category)}</span>
+            <span style="float: right; color: ${cat.changePercent >= 0 ? '#16a34a' : '#dc2626'};">
+              ${cat.changePercent >= 0 ? '↑' : '↓'} ${Math.abs(cat.changePercent).toFixed(0)}%
+            </span>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Interactive AMP Form -->
+      <div class="amp-form-container">
+        <div class="form-title">Ask a Question About Your Data</div>
+        <amp-form method="post"
+          action-xhr="${Config.WEB_APP.url}"
+          custom-validation-reporting="as-you-go">
+
+          <fieldset>
+            <input type="text"
+              name="question"
+              class="text-input"
+              placeholder="e.g., Compare wine sales vs cocktail sales for last month"
+              required>
+            <input type="hidden" name="email" value="${esc(recipientEmail)}">
+            <input type="hidden" name="source" value="amp_weekly">
+            <input type="hidden" name="amp" value="true">
+            <span visible-when-invalid="valueMissing" validation-for="question">
+              Please enter a question
+            </span>
+          </fieldset>
+
+          <input type="submit" value="Get Custom Report" class="submit-btn">
+
+          <div submit-success>
+            <template type="amp-mustache">
+              <div class="success-message">
+                ✅ Success! Your custom report is being generated and will be sent to your email.
+              </div>
+            </template>
+          </div>
+
+          <div submit-error>
+            <template type="amp-mustache">
+              <div class="error-message">
+                ❌ Unable to process your request. Please try again or reply to this email.
+              </div>
+            </template>
+          </div>
+        </amp-form>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Senso Analytics - Weekly Executive Summary</p>
+      <p>Reply to this email with questions or feedback</p>
+    </div>
+  </div>
+</body>
+</html>`;
   },
 
   /**

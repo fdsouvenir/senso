@@ -42,7 +42,10 @@ function onOpen() {
     .addItem('Send Test Weekly Report', 'sendTestWeeklyReport')
     .addItem('Test Chart Generation', 'testChartGeneration')
     .addSeparator()
-    .addItem('🌐 Configure Web App', 'configureWebApp');
+    .addItem('🌐 Configure Web App', 'configureWebApp')
+    .addSeparator()
+    .addItem('📧 Test Gmail API Connection', 'testGmailApiConnection')
+    .addItem('📧 Send Gmail API Test Email', 'sendGmailApiTestEmail');
 
   // Trigger management submenu
   const triggerMenu = ui.createMenu('⏰ Automated Triggers');
@@ -872,10 +875,13 @@ function doGet(e) {
 /**
  * Web App Handler - Process POST requests (form submissions)
  * @param {Object} e Event object with form data
- * @returns {HtmlOutput} HTML response
+ * @returns {HtmlOutput|TextOutput} HTML response or JSON for AMP
  */
 function doPost(e) {
   try {
+    // Check if this is an AMP request
+    const isAmpRequest = e.parameter.amp === 'true';
+
     // Extract form parameters
     const email = e.parameter.email;
     const question = e.parameter.question;
@@ -883,6 +889,9 @@ function doPost(e) {
 
     // Validate inputs
     if (!email || !question) {
+      if (isAmpRequest) {
+        return createAmpErrorResponse('Email and question are required', e);
+      }
       throw new Error('Email and question are required');
     }
 
@@ -892,7 +901,16 @@ function doPost(e) {
     // Log the request
     ErrorHandler.info('WebApp', `Query processed from ${source}: "${question.substring(0, 50)}..." for ${email}`);
 
-    // Return success page
+    // Handle AMP requests with JSON response
+    if (isAmpRequest) {
+      return createAmpSuccessResponse({
+        question: question,
+        email: email,
+        message: 'Your report is being generated and will be sent to your email.'
+      }, e);
+    }
+
+    // Return success page for regular forms
     const html = `
 <!DOCTYPE html>
 <html>
@@ -961,4 +979,69 @@ function doPost(e) {
       .setTitle('Error - Senso Analytics')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
+}
+
+/**
+ * Create AMP success response with proper CORS headers
+ * @param {Object} data Response data
+ * @param {Object} e Event object with AMP headers
+ * @returns {TextOutput} JSON response with CORS headers
+ */
+function createAmpSuccessResponse(data, e) {
+  const response = ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+
+  // Set AMP CORS headers
+  response.addHeader('Access-Control-Allow-Origin', 'https://mail.google.com');
+  response.addHeader('Access-Control-Allow-Credentials', 'true');
+  response.addHeader('Access-Control-Expose-Headers', 'AMP-Access-Control-Allow-Source-Origin');
+  response.addHeader('AMP-Access-Control-Allow-Source-Origin', e.parameter.__amp_source_origin || 'https://mail.google.com');
+
+  return response;
+}
+
+/**
+ * Create AMP error response with proper CORS headers
+ * @param {string} errorMessage Error message
+ * @param {Object} e Event object with AMP headers
+ * @returns {TextOutput} JSON error response with CORS headers
+ */
+function createAmpErrorResponse(errorMessage, e) {
+  const response = ContentService
+    .createTextOutput(JSON.stringify({
+      error: true,
+      message: errorMessage
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+
+  // Set AMP CORS headers
+  response.addHeader('Access-Control-Allow-Origin', 'https://mail.google.com');
+  response.addHeader('Access-Control-Allow-Credentials', 'true');
+  response.addHeader('Access-Control-Expose-Headers', 'AMP-Access-Control-Allow-Source-Origin');
+  response.addHeader('AMP-Access-Control-Allow-Source-Origin', e.parameter.__amp_source_origin || 'https://mail.google.com');
+
+  // Set error status code
+  response.addHeader('HTTP/1.1 400 Bad Request');
+
+  return response;
+}
+
+/**
+ * Handle CORS preflight requests for AMP
+ * @param {Object} e Event object
+ * @returns {TextOutput} Empty response with CORS headers
+ */
+function doOptions(e) {
+  const response = ContentService
+    .createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT);
+
+  // Set CORS headers for preflight
+  response.addHeader('Access-Control-Allow-Origin', 'https://mail.google.com');
+  response.addHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  response.addHeader('Access-Control-Allow-Headers', 'Content-Type, AMP-Same-Origin');
+  response.addHeader('Access-Control-Allow-Credentials', 'true');
+
+  return response;
 }
