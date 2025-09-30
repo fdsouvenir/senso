@@ -7,6 +7,21 @@
 
 const ChartGenerator = {
   /**
+   * Helper function to build URL query strings (URLSearchParams not available in Apps Script)
+   * @param {Object} params Parameters object
+   * @returns {string} Query string
+   */
+  buildQueryString(params) {
+    const queryParts = [];
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== null && value !== undefined) {
+        queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+      }
+    }
+    return queryParts.join('&');
+  },
+
+  /**
    * Generate a chart URL based on data and type
    * @param {Object} options Chart options
    * @returns {string} Chart image URL
@@ -48,44 +63,44 @@ const ChartGenerator = {
    */
   generateBarChart(data, title, width, height, colors, labels) {
     const baseUrl = Config.CHARTS.apiEndpoint;
-    const params = new URLSearchParams();
+    const params = {};
 
     // Chart type: horizontal bar
-    params.append('cht', 'bhs');
+    params['cht'] = 'bhs';
 
     // Chart size
-    params.append('chs', `${width}x${height}`);
+    params['chs'] = `${width}x${height}`;
 
     // Chart data
     const values = data.map(d => d.value || d);
     const maxValue = Math.max(...values);
-    params.append('chd', `t:${values.join(',')}`);
+    params['chd'] = `t:${values.join(',')}`;
 
     // Data scaling
-    params.append('chds', `0,${maxValue}`);
+    params['chds'] = `0,${maxValue}`;
 
     // Chart title
     if (title) {
-      params.append('chtt', title);
+      params['chtt'] = title;
     }
 
     // Colors
     const chartColors = colors || [Config.CHARTS.colors.primary];
-    params.append('chco', chartColors.join('|'));
+    params['chco'] = chartColors.join('|');
 
     // Axis labels
     if (labels) {
-      params.append('chxl', `1:|${labels.join('|')}`);
-      params.append('chxt', 'x,y');
+      params['chxl'] = `1:|${labels.join('|')}`;
+      params['chxt'] = 'x,y';
     }
 
     // Grid lines
-    params.append('chg', '10,10,1,5');
+    params['chg'] = '10,10,1,5';
 
     // Bar width and spacing
-    params.append('chbh', 'a');
+    params['chbh'] = 'a';
 
-    return `${baseUrl}?${params.toString()}`;
+    return `${baseUrl}?${this.buildQueryString(params)}`;
   },
 
   /**
@@ -100,55 +115,55 @@ const ChartGenerator = {
    */
   generateLineChart(data, title, width, height, colors, labels) {
     const baseUrl = Config.CHARTS.apiEndpoint;
-    const params = new URLSearchParams();
+    const params = {};
 
     // Chart type: line with markers
-    params.append('cht', 'lc');
+    params['cht'] = 'lc';
 
     // Chart size
-    params.append('chs', `${width}x${height}`);
+    params['chs'] = `${width}x${height}`;
 
     // Chart data
     const values = data.map(d => d.value || d);
     const maxValue = Math.max(...values);
     const minValue = Math.min(...values);
-    params.append('chd', `t:${values.join(',')}`);
+    params['chd'] = `t:${values.join(',')}`;
 
     // Data scaling
-    params.append('chds', `${minValue},${maxValue}`);
+    params['chds'] = `${minValue},${maxValue}`;
 
     // Chart title
     if (title) {
-      params.append('chtt', title);
+      params['chtt'] = title;
     }
 
     // Colors
     const chartColors = colors || [Config.CHARTS.colors.primary];
-    params.append('chco', chartColors.join('|'));
+    params['chco'] = chartColors.join('|');
 
     // Line style (solid, 2px)
-    params.append('chls', '2');
+    params['chls'] = '2';
 
     // Markers
-    params.append('chm', 'o,FFFFFF,0,-1,8|N,000000,0,-1,10');
+    params['chm'] = 'o,FFFFFF,0,-1,8|N,000000,0,-1,10';
 
     // Axis labels
     if (labels) {
       // X-axis labels
-      params.append('chxl', `0:|${labels.join('|')}`);
-      params.append('chxt', 'x,y');
+      params['chxl'] = `0:|${labels.join('|')}`;
+      params['chxt'] = 'x,y';
 
       // Y-axis range
-      params.append('chxr', `1,${minValue},${maxValue}`);
+      params['chxr'] = `1,${minValue},${maxValue}`;
     }
 
     // Grid lines
-    params.append('chg', '25,25,1,5');
+    params['chg'] = '25,25,1,5';
 
     // Background
-    params.append('chf', 'bg,s,FFFFFF');
+    params['chf'] = 'bg,s,FFFFFF';
 
-    return `${baseUrl}?${params.toString()}`;
+    return `${baseUrl}?${this.buildQueryString(params)}`;
   },
 
   /**
@@ -162,35 +177,35 @@ const ChartGenerator = {
    */
   generatePieChart(data, title, width, height, colors) {
     const baseUrl = Config.CHARTS.apiEndpoint;
-    const params = new URLSearchParams();
+    const params = {};
 
     // Chart type: 3D pie
-    params.append('cht', 'p3');
+    params['cht'] = 'p3';
 
     // Chart size
-    params.append('chs', `${width}x${height}`);
+    params['chs'] = `${width}x${height}`;
 
     // Chart data
     const values = data.map(d => d.value || d);
-    params.append('chd', `t:${values.join(',')}`);
+    params['chd'] = `t:${values.join(',')}`;
 
     // Chart title
     if (title) {
-      params.append('chtt', title);
+      params['chtt'] = title;
     }
 
     // Colors
     const chartColors = colors || this.generateColorPalette(data.length);
-    params.append('chco', chartColors.join('|'));
+    params['chco'] = chartColors.join('|');
 
     // Labels
     const labels = data.map(d => `${d.label || d.name} (${d.value})`);
-    params.append('chl', labels.join('|'));
+    params['chl'] = labels.join('|');
 
     // Legend position
-    params.append('chdlp', 'b');
+    params['chdlp'] = 'b';
 
-    return `${baseUrl}?${params.toString()}`;
+    return `${baseUrl}?${this.buildQueryString(params)}`;
   },
 
   /**
@@ -205,48 +220,48 @@ const ChartGenerator = {
    */
   generateColumnChart(data, title, width, height, colors, labels) {
     const baseUrl = Config.CHARTS.apiEndpoint;
-    const params = new URLSearchParams();
+    const params = {};
 
     // Chart type: vertical bar (column)
-    params.append('cht', 'bvs');
+    params['cht'] = 'bvs';
 
     // Chart size
-    params.append('chs', `${width}x${height}`);
+    params['chs'] = `${width}x${height}`;
 
     // Chart data
     const values = data.map(d => d.value || d);
     const maxValue = Math.max(...values);
-    params.append('chd', `t:${values.join(',')}`);
+    params['chd'] = `t:${values.join(',')}`;
 
     // Data scaling
-    params.append('chds', `0,${maxValue}`);
+    params['chds'] = `0,${maxValue}`;
 
     // Chart title
     if (title) {
-      params.append('chtt', title);
+      params['chtt'] = title;
     }
 
     // Colors
     const chartColors = colors || [Config.CHARTS.colors.primary];
-    params.append('chco', chartColors.join('|'));
+    params['chco'] = chartColors.join('|');
 
     // Axis labels
     if (labels) {
-      params.append('chxl', `0:|${labels.join('|')}`);
-      params.append('chxt', 'x,y');
-      params.append('chxr', `1,0,${maxValue}`);
+      params['chxl'] = `0:|${labels.join('|')}`;
+      params['chxt'] = 'x,y';
+      params['chxr'] = `1,0,${maxValue}`;
     }
 
     // Value labels on bars
-    params.append('chm', 'N,000000,0,-1,11');
+    params['chm'] = 'N,000000,0,-1,11';
 
     // Bar width and spacing
-    params.append('chbh', '20,5,10');
+    params['chbh'] = '20,5,10';
 
     // Grid lines
-    params.append('chg', '0,10,1,5');
+    params['chg'] = '0,10,1,5';
 
-    return `${baseUrl}?${params.toString()}`;
+    return `${baseUrl}?${this.buildQueryString(params)}`;
   },
 
   /**
@@ -258,41 +273,41 @@ const ChartGenerator = {
    */
   generateComparisonChart(data1, data2, title) {
     const baseUrl = Config.CHARTS.apiEndpoint;
-    const params = new URLSearchParams();
+    const params = {};
 
     // Chart type: grouped bar
-    params.append('cht', 'bvg');
-    params.append('chs', '600x400');
+    params['cht'] = 'bvg';
+    params['chs'] = '600x400';
 
     // Combine data
     const values1 = data1.values || [];
     const values2 = data2.values || [];
     const maxValue = Math.max(...values1, ...values2);
 
-    params.append('chd', `t:${values1.join(',')}|${values2.join(',')}`);
-    params.append('chds', `0,${maxValue},0,${maxValue}`);
+    params['chd'] = `t:${values1.join(',')}|${values2.join(',')}`;
+    params['chds'] = `0,${maxValue},0,${maxValue}`;
 
     // Title
-    params.append('chtt', title);
+    params['chtt'] = title;
 
     // Colors
-    params.append('chco', `${Config.CHARTS.colors.primary},${Config.CHARTS.colors.secondary}`);
+    params['chco'] = `${Config.CHARTS.colors.primary},${Config.CHARTS.colors.secondary}`;
 
     // Legend
-    params.append('chdl', `${data1.label}|${data2.label}`);
-    params.append('chdlp', 'b');
+    params['chdl'] = `${data1.label}|${data2.label}`;
+    params['chdlp'] = 'b';
 
     // Labels
     if (data1.labels) {
-      params.append('chxl', `0:|${data1.labels.join('|')}`);
-      params.append('chxt', 'x,y');
-      params.append('chxr', `1,0,${maxValue}`);
+      params['chxl'] = `0:|${data1.labels.join('|')}`;
+      params['chxt'] = 'x,y';
+      params['chxr'] = `1,0,${maxValue}`;
     }
 
     // Bar width
-    params.append('chbh', '15,5,10');
+    params['chbh'] = '15,5,10';
 
-    return `${baseUrl}?${params.toString()}`;
+    return `${baseUrl}?${this.buildQueryString(params)}`;
   },
 
   /**
@@ -304,11 +319,11 @@ const ChartGenerator = {
    */
   generateTrendChart(datasets, title, xLabels) {
     const baseUrl = Config.CHARTS.apiEndpoint;
-    const params = new URLSearchParams();
+    const params = {};
 
     // Chart type: line chart
-    params.append('cht', 'lc');
-    params.append('chs', '600x300');
+    params['cht'] = 'lc';
+    params['chs'] = '600x300';
 
     // Combine all data
     const allValues = datasets.map(ds => ds.values || []);
@@ -318,11 +333,11 @@ const ChartGenerator = {
 
     // Format data for multiple series
     const dataString = allValues.map(values => values.join(',')).join('|');
-    params.append('chd', `t:${dataString}`);
-    params.append('chds', `${minValue},${maxValue}`);
+    params['chd'] = `t:${dataString}`;
+    params['chds'] = `${minValue},${maxValue}`;
 
     // Title
-    params.append('chtt', title);
+    params['chtt'] = title;
 
     // Colors
     const colors = [
@@ -330,35 +345,35 @@ const ChartGenerator = {
       Config.CHARTS.colors.secondary,
       Config.CHARTS.colors.accent
     ].slice(0, datasets.length);
-    params.append('chco', colors.join(','));
+    params['chco'] = colors.join(',');
 
     // Line styles
     const lineStyles = datasets.map(() => '2').join('|');
-    params.append('chls', lineStyles);
+    params['chls'] = lineStyles;
 
     // Legend
     if (datasets.length > 1) {
       const legends = datasets.map(ds => ds.label || '').filter(l => l);
       if (legends.length > 0) {
-        params.append('chdl', legends.join('|'));
-        params.append('chdlp', 'b');
+        params['chdl'] = legends.join('|');
+        params['chdlp'] = 'b';
       }
     }
 
     // Axis labels
     if (xLabels) {
-      params.append('chxl', `0:|${xLabels.join('|')}`);
-      params.append('chxt', 'x,y');
-      params.append('chxr', `1,${minValue},${maxValue}`);
+      params['chxl'] = `0:|${xLabels.join('|')}`;
+      params['chxt'] = 'x,y';
+      params['chxr'] = `1,${minValue},${maxValue}`;
     }
 
     // Grid
-    params.append('chg', '25,25,1,5');
+    params['chg'] = '25,25,1,5';
 
     // Markers on data points
-    params.append('chm', 'o,FFFFFF,0,-1,6');
+    params['chm'] = 'o,FFFFFF,0,-1,6';
 
-    return `${baseUrl}?${params.toString()}`;
+    return `${baseUrl}?${this.buildQueryString(params)}`;
   },
 
   /**
@@ -368,16 +383,16 @@ const ChartGenerator = {
    */
   generateSparkline(data) {
     const baseUrl = Config.CHARTS.apiEndpoint;
-    const params = new URLSearchParams();
+    const params = {};
 
-    params.append('cht', 'ls');
-    params.append('chs', '100x30');
-    params.append('chd', `t:${data.join(',')}`);
-    params.append('chco', Config.CHARTS.colors.primary);
-    params.append('chls', '1');
-    params.append('chm', 'B,E3F2FD,0,0,0');
+    params['cht'] = 'ls';
+    params['chs'] = '100x30';
+    params['chd'] = `t:${data.join(',')}`;
+    params['chco'] = Config.CHARTS.colors.primary;
+    params['chls'] = '1';
+    params['chm'] = 'B,E3F2FD,0,0,0';
 
-    return `${baseUrl}?${params.toString()}`;
+    return `${baseUrl}?${this.buildQueryString(params)}`;
   },
 
   /**
