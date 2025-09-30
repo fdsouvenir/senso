@@ -198,7 +198,7 @@ const EmailService = {
       <!-- Prediction -->
       <div class="prediction-box">
         <div class="prediction-title">Tomorrow's Forecast</div>
-        <div class="prediction-value">Prediction #${data.prediction.id}: <strong>$${(data.prediction.amount || 0).toLocaleString()}</strong></div>
+        <div class="prediction-value"><strong>$${(data.prediction.amount || 0).toLocaleString()}</strong></div>
         <div class="prediction-reason">${data.prediction.reasoning}</div>
         <div class="confidence">
           Confidence: ${data.prediction.confidence || 0}/10
