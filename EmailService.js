@@ -225,10 +225,39 @@ const EmailService = {
     // Escape HTML in all user data
     const esc = SecurityUtils.escapeHtml;
 
+    // Format dates with ordinals
+    const formatDateWithOrdinal = (dateStr) => {
+      const date = new Date(dateStr);
+      const day = date.getDate();
+      const suffix = ['th', 'st', 'nd', 'rd'][day % 10 > 3 ? 0 : (day % 100 - day % 10 !== 10) * day % 10];
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      return `${monthNames[date.getMonth()]} ${day}${suffix}`;
+    };
+
     // Calculate key metrics
     const weekChange = parseFloat(data.weekComparison || 0);
     const weekChangeColor = weekChange >= 0 ? '#16a34a' : '#dc2626';
     const weekChangeSymbol = weekChange >= 0 ? '↑' : '↓';
+
+    // Generate AI-powered insight if available, fallback to improved logic
+    const keyInsight = data.aiInsight || (() => {
+      if (data.significantChanges && data.significantChanges.length > 0) {
+        const topChange = data.significantChanges[0];
+        if (weekChange > 20) {
+          return `Exceptional performance with ${weekChange.toFixed(0)}% growth vs last week. ${topChange.item} led with ${topChange.description}.`;
+        } else if (weekChange > 0) {
+          return `Solid week with ${weekChange.toFixed(0)}% growth vs last week. ${topChange.item} showed strong performance.`;
+        } else if (weekChange > -10) {
+          return `Down ${Math.abs(weekChange).toFixed(0)}% vs last week. Focus on ${topChange.item}: ${topChange.description}.`;
+        } else {
+          return `Significant decline of ${Math.abs(weekChange).toFixed(0)}% vs last week. Immediate attention needed for ${topChange.item}.`;
+        }
+      }
+      // Fallback to basic insight
+      return weekChange > 0 ?
+        `Sales up ${weekChange.toFixed(0)}% compared to last week.` :
+        `Sales down ${Math.abs(weekChange).toFixed(0)}% compared to last week.`;
+    })();
 
     // Build executive-focused weekly report
     const html = `
@@ -243,11 +272,15 @@ const EmailService = {
 
     /* Executive Summary */
     .executive-summary { background: #1e3a5f; color: white; padding: 24px; }
-    .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 16px; }
+    .week-header { text-align: center; margin-bottom: 20px; }
+    .week-dates { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
+    .week-label { font-size: 12px; opacity: 0.8; text-transform: uppercase; }
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
     .metric-block { text-align: center; }
     .metric-label { font-size: 11px; text-transform: uppercase; opacity: 0.8; margin-bottom: 4px; }
     .metric-value { font-size: 28px; font-weight: bold; line-height: 1; }
-    .metric-change { font-size: 14px; margin-top: 4px; }
+    .metric-change { font-size: 13px; margin-top: 4px; }
+    .metric-comparison { font-size: 11px; opacity: 0.7; }
     .positive { color: #4ade80; }
     .negative { color: #f87171; }
     .neutral { color: #fbbf24; }
@@ -255,7 +288,7 @@ const EmailService = {
     /* Key Insight */
     .key-insight { background: #f0f9ff; border-left: 4px solid #0891b2; padding: 16px; margin: 20px; }
     .insight-title { font-size: 12px; text-transform: uppercase; color: #0891b2; margin-bottom: 4px; }
-    .insight-text { font-size: 16px; color: #1e40af; }
+    .insight-text { font-size: 16px; color: #1e40af; line-height: 1.4; }
 
     /* Content sections */
     .content { padding: 20px; }
@@ -264,8 +297,9 @@ const EmailService = {
 
     /* Data tables */
     .data-table { width: 100%; }
-    .data-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
-    .data-label { color: #374151; flex: 1; }
+    .data-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
+    .data-label { color: #374151; flex: 1; padding-right: 10px; }
+    .data-value-group { display: flex; align-items: center; gap: 8px; }
     .data-value { color: #111827; font-weight: 600; text-align: right; }
     .data-change { font-size: 13px; color: #6b7280; }
 
@@ -279,6 +313,13 @@ const EmailService = {
     .forecast-value { font-size: 24px; font-weight: bold; color: #451a03; }
     .forecast-detail { font-size: 13px; color: #78350f; margin-top: 4px; }
 
+    /* Form section */
+    .form-section { background: #f5f5f5; padding: 20px; margin: 20px; border-radius: 8px; }
+    .form-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; color: #333; }
+    .text-input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+    .submit-btn { background: #4285F4; color: white; padding: 12px 24px; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 10px; width: 100%; }
+    .submit-btn:hover { background: #3574e2; }
+
     /* Footer */
     .footer { background: #f9fafb; padding: 16px; text-align: center; color: #6b7280; font-size: 11px; border-top: 1px solid #e5e7eb; }
 
@@ -286,6 +327,7 @@ const EmailService = {
     @media (max-width: 480px) {
       .summary-grid { grid-template-columns: 1fr; gap: 16px; }
       .metric-value { font-size: 24px; }
+      .week-dates { font-size: 18px; }
     }
   </style>
 </head>
@@ -293,27 +335,31 @@ const EmailService = {
   <div class="container">
     <!-- Executive Summary -->
     <div class="executive-summary">
+      <div class="week-header">
+        <div class="week-dates">Week of ${formatDateWithOrdinal(data.weekStartDate)} to ${formatDateWithOrdinal(data.weekEndDate)}</div>
+        <div class="week-label">Weekly Performance Summary</div>
+      </div>
       <div class="summary-grid">
         <div class="metric-block">
-          <div class="metric-label">Week Total</div>
+          <div class="metric-label">Total Sales</div>
           <div class="metric-value">$${(data.weekTotal || 0).toLocaleString()}</div>
           <div class="metric-change ${weekChange >= 0 ? 'positive' : 'negative'}">
             ${weekChangeSymbol} ${Math.abs(weekChange).toFixed(0)}%
           </div>
+          <div class="metric-comparison">vs last week</div>
         </div>
         <div class="metric-block">
           <div class="metric-label">Daily Average</div>
           <div class="metric-value">$${((data.weekTotal || 0) / 7).toFixed(0).toLocaleString()}</div>
           <div class="metric-change neutral">7-day avg</div>
+          <div class="metric-comparison">&nbsp;</div>
         </div>
         <div class="metric-block">
           <div class="metric-label">Best Day</div>
           <div class="metric-value">${esc(data.bestDay || 'N/A')}</div>
-          <div class="metric-change neutral">${esc(data.sundayData?.dayName || '')}</div>
+          <div class="metric-change neutral">${data.sundayData?.totalSales ? '$' + data.sundayData.totalSales.toLocaleString() : ''}</div>
+          <div class="metric-comparison">&nbsp;</div>
         </div>
-      </div>
-      <div style="text-align: center; font-size: 14px; opacity: 0.9;">
-        Week of ${esc(data.weekStartDate)} - ${esc(data.weekEndDate)}
       </div>
     </div>
 
@@ -321,35 +367,32 @@ const EmailService = {
     <div class="key-insight">
       <div class="insight-title">Key Insight</div>
       <div class="insight-text">
-        ${weekChange > 20 ? 'Strong week with significant growth across multiple categories.' :
-          weekChange > 0 ? 'Steady performance with moderate growth compared to last week.' :
-          weekChange > -10 ? 'Slight decline but within normal variance range.' :
-          'Notable decline requiring attention - review category performance below.'}
+        ${esc(keyInsight)}
       </div>
     </div>
 
     <div class="content">
-      <!-- Top Categories -->
+      <!-- Category Performance -->
       <div class="section">
-        <div class="section-title">Top Performing Categories</div>
-        ${(data.categoryPerformance || []).slice(0, 3).map(cat => `
+        <div class="section-title">Category Performance</div>
+        ${(data.categoryPerformance || []).slice(0, 10).map(cat => `
           <div class="data-row">
             <span class="data-label">${esc(cat.category)}</span>
-            <span>
+            <div class="data-value-group">
               <span class="data-value">$${(cat.currentSales || 0).toFixed(0).toLocaleString()}</span>
-              <span class="data-change ${cat.changePercent >= 0 ? 'positive' : 'negative'}" style="margin-left: 8px;">
-                ${cat.changePercent >= 0 ? '+' : ''}${cat.changePercent.toFixed(0)}%
+              <span class="data-change ${cat.changePercent >= 0 ? 'positive' : 'negative'}">
+                ${cat.changePercent >= 0 ? '↑' : '↓'} ${Math.abs(cat.changePercent).toFixed(0)}% vs last week
               </span>
-            </span>
+            </div>
           </div>
         `).join('')}
       </div>
 
-      <!-- Notable Changes (Top 3 only) -->
+      <!-- Significant Changes -->
       ${data.significantChanges && data.significantChanges.length > 0 ? `
         <div class="section">
-          <div class="section-title">Notable Changes</div>
-          ${data.significantChanges.slice(0, 3).map(change => `
+          <div class="section-title">Notable Changes This Week</div>
+          ${data.significantChanges.slice(0, 10).map(change => `
             <div class="data-row">
               <span class="data-label">${esc(change.item)}</span>
               <span class="data-value ${change.positive ? 'positive' : 'negative'}">
@@ -362,23 +405,34 @@ const EmailService = {
 
       <!-- Sunday Performance -->
       <div class="section">
-        <div class="section-title">Yesterday's Performance</div>
+        <div class="section-title">Yesterday's Performance (${esc(data.sundayData?.dayName || 'Sunday')})</div>
         <div class="data-row">
           <span class="data-label">Total Sales</span>
-          <span class="data-value">$${(data.sundayData?.totalSales || 0).toLocaleString()}</span>
+          <div class="data-value-group">
+            <span class="data-value">$${(data.sundayData?.totalSales || 0).toLocaleString()}</span>
+            <span class="data-change ${data.sundayData?.percentChange >= 0 ? 'positive' : 'negative'}">
+              ${data.sundayData?.percentChange >= 0 ? '↑' : '↓'} ${Math.abs(data.sundayData?.percentChange || 0).toFixed(1)}% vs last ${esc(data.sundayData?.dayName || 'Sunday')}
+            </span>
+          </div>
         </div>
-        <div class="data-row">
-          <span class="data-label">vs Last ${esc(data.sundayData?.dayName || 'Sunday')}</span>
-          <span class="data-value ${data.sundayData?.percentChange >= 0 ? 'positive' : 'negative'}">
-            ${data.sundayData?.percentChange >= 0 ? '+' : ''}${(data.sundayData?.percentChange || 0).toFixed(1)}%
-          </span>
-        </div>
+        ${data.sundayData?.categories ? `
+          <div style="margin-top: 12px;">
+            <div style="font-size: 13px; color: #6b7280; margin-bottom: 8px;">Top Items Yesterday:</div>
+            ${(data.sundayData.categories || []).slice(0, 3).map(cat =>
+              (cat.items || []).slice(0, 2).map(item => `
+                <div style="padding: 4px 0; font-size: 13px; color: #4b5563;">
+                  • ${esc(item.name)}: $${(item.sales || 0).toLocaleString()}
+                </div>
+              `).join('')
+            ).join('')}
+          </div>
+        ` : ''}
       </div>
 
       <!-- Week Trend Chart -->
       ${data.sundayData?.trendChartUrl ? `
         <div class="chart-container">
-          <div class="chart-title">3-Week Trend</div>
+          <div class="chart-title">3-Week ${esc(data.sundayData?.dayName || 'Sunday')} Trend</div>
           <img src="${esc(data.sundayData.trendChartUrl)}" alt="Weekly trend" style="max-width: 100%; height: auto;">
         </div>
       ` : ''}
@@ -389,15 +443,26 @@ const EmailService = {
       <div class="forecast-label">This Week's Projection</div>
       <div class="forecast-value">$${(data.weeklyPrediction?.amount || 0).toLocaleString()}</div>
       <div class="forecast-detail">
-        ${data.weeklyPrediction?.confidence >= 7 ? 'High confidence' :
-          data.weeklyPrediction?.confidence >= 4 ? 'Moderate confidence' :
-          'Variable historical pattern'}
+        ${data.weeklyPrediction?.confidence >= 7 ? 'High confidence based on consistent historical patterns' :
+          data.weeklyPrediction?.confidence >= 4 ? 'Moderate confidence - some variability in historical data' :
+          'Low confidence - significant variance in historical patterns'}
       </div>
+    </div>
+
+    <!-- Interactive Form -->
+    <div class="form-section">
+      <div class="form-title">Ask a Question About Your Data</div>
+      <form action="${Config.WEB_APP.url || '#'}" method="POST">
+        <input type="text" class="text-input" name="question" placeholder="e.g., Compare wine sales vs cocktail sales for last month" required>
+        <input type="hidden" name="email" value="${Session.getActiveUser().getEmail()}">
+        <input type="hidden" name="source" value="weekly_report">
+        <button type="submit" class="submit-btn">Get Custom Report</button>
+      </form>
     </div>
 
     <div class="footer">
       <p>Senso Analytics - Weekly Executive Summary</p>
-      <p>Full details available at dashboard.sensosushi.com</p>
+      <p>Reply to this email with questions or feedback</p>
     </div>
   </div>
 </body>

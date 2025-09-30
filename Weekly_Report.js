@@ -47,7 +47,8 @@ const WeeklyReport = {
         ? ((weekMetrics.total - previousWeekMetrics.total) / previousWeekMetrics.total * 100)
         : 0;
 
-      return {
+      // Prepare data for return
+      const reportData = {
         weekStartDate: Config.formatDate(monday),
         weekEndDate: Config.formatDate(sunday),
         sundayData: sundayReport,
@@ -62,6 +63,19 @@ const WeeklyReport = {
         bestDay: weekMetrics.bestDay,
         worstDay: weekMetrics.worstDay
       };
+
+      // Generate AI-powered insight
+      try {
+        const aiInsight = GeminiService.generateWeeklyInsight(reportData);
+        if (aiInsight) {
+          reportData.aiInsight = aiInsight;
+          ErrorHandler.info('WeeklyReport', 'AI insight generated successfully');
+        }
+      } catch (error) {
+        ErrorHandler.info('WeeklyReport', 'AI insight generation failed, using fallback');
+      }
+
+      return reportData;
     } catch (error) {
       ErrorHandler.handleError(error, 'WeeklyReport.generate', { weekEndDate });
       return this.getErrorReport(weekEndDate);

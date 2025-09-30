@@ -754,3 +754,153 @@ function configureFrontendSettings() {
     }
   }
 }
+
+/**
+ * Web App Handler - Process GET requests
+ * @param {Object} e Event object with query parameters
+ * @returns {HtmlOutput} HTML response
+ */
+function doGet(e) {
+  try {
+    // Simple landing page for the web app
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Senso Analytics Q&A</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h1 { color: #1e3a5f; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input[type="text"], input[type="email"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+    button { background: #4285F4; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #3574e2; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Senso Analytics Q&A</h1>
+    <p>Ask questions about your restaurant data and receive custom reports via email.</p>
+
+    <form method="POST" action="${ScriptApp.getService().getUrl()}">
+      <div class="form-group">
+        <label for="email">Email Address:</label>
+        <input type="email" id="email" name="email" required placeholder="your@email.com">
+      </div>
+
+      <div class="form-group">
+        <label for="question">Your Question:</label>
+        <input type="text" id="question" name="question" required placeholder="e.g., Show me wine sales from last week">
+      </div>
+
+      <button type="submit">Get Report</button>
+    </form>
+  </div>
+</body>
+</html>
+    `;
+
+    return HtmlService.createHtmlOutput(html)
+      .setTitle('Senso Analytics Q&A')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch (error) {
+    ErrorHandler.handleError(error, 'doGet', { params: e });
+    return HtmlService.createHtmlOutput('An error occurred. Please try again later.');
+  }
+}
+
+/**
+ * Web App Handler - Process POST requests (form submissions)
+ * @param {Object} e Event object with form data
+ * @returns {HtmlOutput} HTML response
+ */
+function doPost(e) {
+  try {
+    // Extract form parameters
+    const email = e.parameter.email;
+    const question = e.parameter.question;
+    const source = e.parameter.source || 'web_form';
+
+    // Validate inputs
+    if (!email || !question) {
+      throw new Error('Email and question are required');
+    }
+
+    // Process the query
+    const response = QueryHandler.processQuery(question, email);
+
+    // Log the request
+    ErrorHandler.info('WebApp', `Query processed from ${source}: "${question.substring(0, 50)}..." for ${email}`);
+
+    // Return success page
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Report Sent - Senso Analytics</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h1 { color: #16a34a; }
+    .message { background: #f0f9ff; border-left: 4px solid #0891b2; padding: 15px; margin: 20px 0; }
+    a { color: #4285F4; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>✅ Report Sent Successfully</h1>
+    <div class="message">
+      <p>Your custom report has been sent to <strong>${email}</strong></p>
+      <p>Question: "${question}"</p>
+    </div>
+    <p>Check your email for the detailed report. It may take a few moments to arrive.</p>
+    <p><a href="${ScriptApp.getService().getUrl()}">Ask another question</a></p>
+  </div>
+</body>
+</html>
+    `;
+
+    return HtmlService.createHtmlOutput(html)
+      .setTitle('Report Sent - Senso Analytics')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+
+  } catch (error) {
+    ErrorHandler.handleError(error, 'doPost', { email: e.parameter.email, question: e.parameter.question });
+
+    // Return error page
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Error - Senso Analytics</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h1 { color: #dc2626; }
+    .error { background: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0; }
+    a { color: #4285F4; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>❌ Unable to Process Request</h1>
+    <div class="error">
+      <p>We encountered an error processing your request.</p>
+      <p>Error: ${error.toString()}</p>
+    </div>
+    <p>Please try again or contact support if the issue persists.</p>
+    <p><a href="${ScriptApp.getService().getUrl()}">Try again</a></p>
+  </div>
+</body>
+</html>
+    `;
+
+    return HtmlService.createHtmlOutput(html)
+      .setTitle('Error - Senso Analytics')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+}

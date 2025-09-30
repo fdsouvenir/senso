@@ -93,5 +93,79 @@ const GeminiService = {
       Logger.log(`Original raw response from Gemini: ${responseText}`);
       return null;
     }
+  },
+
+  /**
+   * Generate AI-powered weekly insight based on performance data
+   * @param {Object} weekData Weekly report data including metrics and changes
+   * @returns {string} Generated insight text
+   */
+  generateWeeklyInsight: function(weekData) {
+    try {
+      // Rate limiting check
+      const rateLimitKey = 'gemini_insight_' + Session.getActiveUser().getEmail();
+      if (!SecurityUtils.checkRateLimit(rateLimitKey, 5, 60)) {
+        Logger.log('Gemini insight rate limit exceeded, using fallback');
+        return null;
+      }
+
+      // Prepare context for AI analysis
+      const topChanges = (weekData.significantChanges || []).slice(0, 3)
+        .map(c => `${c.item}: ${c.description}`)
+        .join('; ');
+
+      const topCategories = (weekData.categoryPerformance || []).slice(0, 3)
+        .map(c => `${c.category}: ${c.changePercent > 0 ? '+' : ''}${c.changePercent.toFixed(0)}%`)
+        .join(', ');
+
+      const prompt = `
+        You are a restaurant analytics expert. Generate ONE concise, actionable insight (max 2 sentences) based on this week's performance data.
+
+        Week Total: $${weekData.weekTotal}
+        Change vs Last Week: ${weekData.weekComparison}%
+        Best Day: ${weekData.bestDay}
+        Top Category Changes: ${topCategories}
+        Notable Item Changes: ${topChanges}
+
+        Focus on the most important finding. Be specific - mention actual items or categories.
+        If performance is good, highlight what's driving it. If declining, identify the main concern.
+        Do not use generic phrases like "strong week" or "growth across categories".
+
+        Return only the insight text, no formatting or labels.
+      `;
+
+      const payload = {
+        "contents": [{
+          "role": "user",
+          "parts": [{ "text": prompt }]
+        }],
+        "generationConfig": {
+          "temperature": 0.3,
+          "maxOutputTokens": 100
+        }
+      };
+
+      const options = {
+        'method': 'post',
+        'contentType': 'application/json',
+        'payload': JSON.stringify(payload),
+        'muteHttpExceptions': true,
+        'deadline': 10
+      };
+
+      const response = UrlFetchApp.fetch(this.getApiEndpoint(), options);
+      const responseJson = JSON.parse(response.getContentText());
+
+      if (responseJson.candidates && responseJson.candidates[0]) {
+        const insight = responseJson.candidates[0].content.parts[0].text.trim();
+        Logger.log('AI insight generated: ' + insight);
+        return insight;
+      }
+
+      return null;
+    } catch (error) {
+      Logger.log('Failed to generate AI insight: ' + error.toString());
+      return null;
+    }
   }
 };
