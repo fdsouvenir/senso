@@ -56,10 +56,12 @@ const EmailService = {
    * @returns {boolean} Success status
    */
   sendDailyReport(reportData) {
+    const recipient = PropertiesService.getScriptProperties().getProperty('REPORT_RECIPIENT') || Session.getActiveUser().getEmail();
     const subject = `Daily Report - ${SecurityUtils.escapeHtml(reportData.date)}`;
-    const htmlBody = this.buildDailyReportHtml(reportData);
+    const htmlBody = this.buildDailyReportHtml(reportData, recipient);
 
     return this.sendEmail({
+      recipient: recipient,
       subject: subject,
       htmlBody: htmlBody
     });
@@ -71,10 +73,12 @@ const EmailService = {
    * @returns {boolean} Success status
    */
   sendWeeklyReport(reportData) {
+    const recipient = PropertiesService.getScriptProperties().getProperty('REPORT_RECIPIENT') || Session.getActiveUser().getEmail();
     const subject = `Weekly Roll-Up - Week of ${SecurityUtils.escapeHtml(reportData.weekStartDate)}`;
-    const htmlBody = this.buildWeeklyReportHtml(reportData);
+    const htmlBody = this.buildWeeklyReportHtml(reportData, recipient);
 
     return this.sendEmail({
+      recipient: recipient,
       subject: subject,
       htmlBody: htmlBody
     });
@@ -83,9 +87,10 @@ const EmailService = {
   /**
    * Build HTML for daily report
    * @param {Object} data Report data
+   * @param {string} recipientEmail Email address of recipient
    * @returns {string} HTML content
    */
-  buildDailyReportHtml(data) {
+  buildDailyReportHtml(data, recipientEmail = '') {
     const changeColor = data.percentChange >= 0 ? '#34A853' : '#EA4335';
     const changeSymbol = data.percentChange >= 0 ? '↑' : '↓';
 
@@ -200,6 +205,8 @@ const EmailService = {
         <div class="form-title">Ask a Question About Your Data</div>
         <form action="${Config.WEB_APP.url || '#'}" method="POST">
           <input type="text" class="text-input" name="question" placeholder="e.g., Show me wine sales from last week" required>
+          <input type="hidden" name="email" value="${esc(recipientEmail)}">
+          <input type="hidden" name="source" value="daily_report">
           <button type="submit" class="submit-btn">Get Report</button>
         </form>
       </div>
@@ -219,9 +226,10 @@ const EmailService = {
   /**
    * Build HTML for weekly report
    * @param {Object} data Report data
+   * @param {string} recipientEmail Email address of recipient
    * @returns {string} HTML content
    */
-  buildWeeklyReportHtml(data) {
+  buildWeeklyReportHtml(data, recipientEmail = '') {
     // Escape HTML in all user data
     const esc = SecurityUtils.escapeHtml;
 
@@ -454,7 +462,7 @@ const EmailService = {
       <div class="form-title">Ask a Question About Your Data</div>
       <form action="${Config.WEB_APP.url || '#'}" method="POST">
         <input type="text" class="text-input" name="question" placeholder="e.g., Compare wine sales vs cocktail sales for last month" required>
-        <input type="hidden" name="email" value="${Session.getActiveUser().getEmail()}">
+        <input type="hidden" name="email" value="${esc(recipientEmail)}">
         <input type="hidden" name="source" value="weekly_report">
         <button type="submit" class="submit-btn">Get Custom Report</button>
       </form>
