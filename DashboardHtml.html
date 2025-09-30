@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body { font-family: Arial, sans-serif; padding: 10px; }
+      .status-card { border: 1px solid #ccc; border-radius: 5px; padding: 15px; margin-bottom: 10px; }
+      .status-title { font-weight: bold; margin-bottom: 5px; color: #555; }
+      .status-value { font-size: 1.2em; color: #000; }
+      .status-running { color: #ffa500; }
+      .status-completed { color: #28a745; }
+      .status-failed { color: #dc3545; }
+      button { width: 100%; padding: 8px; font-size: 1em; }
+    </style>
+  </head>
+  <body>
+    <div class="status-card">
+      <div class="status-title">Current Status</div>
+      <div id="status" class="status-value">Loading...</div>
+    </div>
+
+    <div class="status-card">
+      <div class="status-title">Files Processed</div>
+      <div id="processedCount" class="status-value">Loading...</div>
+    </div>
+
+    <div class="status-card">
+      <div class="status-title">Last Activity</div>
+      <div id="lastRun" style="font-size: 0.9em; color: #666;">Loading...</div>
+    </div>
+    
+    <button onclick="refreshStatus()">Refresh Status</button>
+
+    <script>
+      function refreshStatus() {
+        document.getElementById('status').innerText = "Refreshing...";
+        document.getElementById('processedCount').innerText = "Refreshing...";
+        document.getElementById('lastRun').innerText = "Refreshing...";
+        
+        google.script.run.withSuccessHandler(updateDashboard).getStatus();
+      }
+
+      function updateDashboard(statusInfo) {
+        var statusEl = document.getElementById('status');
+        statusEl.innerText = statusInfo.status;
+        
+        // Remove old color classes
+        statusEl.classList.remove('status-running', 'status-completed', 'status-failed');
+
+        // Add new color class based on status text
+        if (statusInfo.status.includes('Running')) {
+          statusEl.classList.add('status-running');
+        } else if (statusInfo.status.includes('Completed')) {
+          statusEl.classList.add('status-completed');
+        } else if (statusInfo.status.includes('Failed') || statusInfo.status.includes('Error')) {
+          statusEl.classList.add('status-failed');
+        }
+
+        document.getElementById('processedCount').innerText = statusInfo.processedCount;
+        document.getElementById('lastRun').innerText = statusInfo.lastRun;
+      }
+      
+      // Load status when the sidebar opens
+      document.addEventListener('DOMContentLoaded', refreshStatus);
+    </script>
+  </body>
+</html>
