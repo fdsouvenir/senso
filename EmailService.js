@@ -2,12 +2,11 @@
  * @OnlyCurrentDoc
  *
  * Email Service for sending daily reports, weekly roll-ups, and custom reports
- * Includes support for AMP for Email interactive components
  */
 
 const EmailService = {
   /**
-   * Send an email with support for AMP, HTML, and text fallbacks
+   * Send an email
    * @param {Object} options Email options
    * @returns {boolean} Success status
    */
@@ -16,7 +15,6 @@ const EmailService = {
       recipient = Session.getActiveUser().getEmail(),
       subject,
       htmlBody,
-      ampBody = null,
       textBody = null,
       attachments = [],
       replyTo = Config.EMAIL.REPLY_TO,
@@ -33,11 +31,6 @@ const EmailService = {
         replyTo: replyTo
       };
 
-      // Add AMP version if provided and supported
-      if (ampBody && Config.AMP.enabled) {
-        mailOptions.htmlBody = this.buildMultipartEmail(ampBody, htmlBody, textBody);
-      }
-
       // Add attachments if any
       if (attachments.length > 0) {
         mailOptions.attachments = attachments;
@@ -47,7 +40,7 @@ const EmailService = {
       MailApp.sendEmail(mailOptions);
 
       // Log engagement
-      this.logEmailSent(recipient, subject, ampBody ? 'amp' : 'html');
+      this.logEmailSent(recipient, subject, 'html');
 
       return true;
     } catch (error) {
@@ -56,18 +49,6 @@ const EmailService = {
     }
   },
 
-  /**
-   * Build multipart email with AMP, HTML, and text versions
-   * @param {string} ampHtml AMP HTML content
-   * @param {string} htmlContent Regular HTML content
-   * @param {string} textContent Plain text content
-   * @returns {string} Multipart email content
-   */
-  buildMultipartEmail(ampHtml, htmlContent, textContent) {
-    // For now, return HTML as Gmail AMP requires special setup
-    // TODO: Implement proper AMP multipart MIME structure
-    return htmlContent;
-  },
 
   /**
    * Send daily report email
@@ -75,14 +56,12 @@ const EmailService = {
    * @returns {boolean} Success status
    */
   sendDailyReport(reportData) {
-    const subject = `Daily Report - ${reportData.date}`;
+    const subject = `Daily Report - ${SecurityUtils.escapeHtml(reportData.date)}`;
     const htmlBody = this.buildDailyReportHtml(reportData);
-    const ampBody = Config.AMP.enabled ? this.buildDailyReportAmp(reportData) : null;
 
     return this.sendEmail({
       subject: subject,
-      htmlBody: htmlBody,
-      ampBody: ampBody
+      htmlBody: htmlBody
     });
   },
 
@@ -92,14 +71,12 @@ const EmailService = {
    * @returns {boolean} Success status
    */
   sendWeeklyReport(reportData) {
-    const subject = `Weekly Roll-Up - Week of ${reportData.weekStartDate}`;
+    const subject = `Weekly Roll-Up - Week of ${SecurityUtils.escapeHtml(reportData.weekStartDate)}`;
     const htmlBody = this.buildWeeklyReportHtml(reportData);
-    const ampBody = Config.AMP.enabled ? this.buildWeeklyReportAmp(reportData) : null;
 
     return this.sendEmail({
       subject: subject,
-      htmlBody: htmlBody,
-      ampBody: ampBody
+      htmlBody: htmlBody
     });
   },
 
@@ -111,6 +88,9 @@ const EmailService = {
   buildDailyReportHtml(data) {
     const changeColor = data.percentChange >= 0 ? '#34A853' : '#EA4335';
     const changeSymbol = data.percentChange >= 0 ? '↑' : '↓';
+
+    // Escape HTML in all user data
+    const esc = SecurityUtils.escapeHtml;
 
     return `
 <!DOCTYPE html>
@@ -156,29 +136,29 @@ const EmailService = {
   <div class="container">
     <div class="header">
       <h1>📊 Daily Sales Report</h1>
-      <div class="date">${data.displayDate}</div>
+      <div class="date">${esc(data.displayDate)}</div>
     </div>
 
     <div class="content">
       <!-- Key Metrics -->
       <div class="metric-card">
         <div class="metric-value">$${(data.totalSales || 0).toLocaleString()}</div>
-        <div class="metric-label">${data.dayName} Total Sales</div>
+        <div class="metric-label">${esc(data.dayName)} Total Sales</div>
         <div class="comparison">
-          ${changeSymbol} ${Math.abs(data.percentChange || 0).toFixed(1)}% vs last ${data.dayName}
+          ${changeSymbol} ${Math.abs(data.percentChange || 0).toFixed(1)}% vs last ${esc(data.dayName)}
         </div>
-        ${data.contextNote ? `<div style="color: #666; margin-top: 10px; font-style: italic;">${data.contextNote}</div>` : ''}
+        ${data.contextNote ? `<div style="color: #666; margin-top: 10px; font-style: italic;">${esc(data.contextNote)}</div>` : ''}
       </div>
 
       <!-- Category Breakdown -->
       ${(data.categories || []).map(category => `
         <div class="category-section">
-          <div class="category-title">${category.name}</div>
+          <div class="category-title">${esc(category.name)}</div>
           <table class="item-table">
             ${(category.items || []).slice(0, 5).map((item, index) => `
               <tr>
                 <td class="item-rank">${index + 1}</td>
-                <td class="item-name">${item.name}</td>
+                <td class="item-name">${esc(item.name)}</td>
                 <td class="item-sales">$${(item.sales || 0).toLocaleString()}</td>
                 <td class="item-quantity">${item.quantity || 0} sold</td>
               </tr>
@@ -190,12 +170,12 @@ const EmailService = {
       <!-- Trend Chart -->
       ${data.trendChartUrl && data.trendChartUrl.length > 0 ? `
         <div class="chart-section">
-          <div class="chart-title">3-Week ${data.dayName} Trend</div>
-          <img src="${data.trendChartUrl}" alt="Sales trend for past 3 ${data.dayName}s" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
+          <div class="chart-title">3-Week ${esc(data.dayName)} Trend</div>
+          <img src="${esc(data.trendChartUrl)}" alt="Sales trend for past 3 ${esc(data.dayName)}s" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
         </div>
       ` : `
         <div class="chart-section">
-          <div class="chart-title">3-Week ${data.dayName} Trend</div>
+          <div class="chart-title">3-Week ${esc(data.dayName)} Trend</div>
           <div style="padding: 20px; background: #f8f9fa; color: #666; text-align: center;">
             Chart data not available
           </div>
@@ -206,7 +186,7 @@ const EmailService = {
       <div class="prediction-box">
         <div class="prediction-title">Tomorrow's Forecast</div>
         <div class="prediction-value"><strong>$${(data.prediction.amount || 0).toLocaleString()}</strong></div>
-        <div class="prediction-reason">${data.prediction.reasoning}</div>
+        <div class="prediction-reason">${esc(data.prediction.reasoning)}</div>
         <div class="confidence">
           Confidence: ${data.prediction.confidence || 0}/10
           ${data.prediction.confidence <= 3 ? ' (Low - high variance in historical data)' :
@@ -215,10 +195,10 @@ const EmailService = {
         </div>
       </div>
 
-      <!-- Interactive Form (Fallback for non-AMP) -->
+      <!-- Interactive Form -->
       <div class="form-section">
         <div class="form-title">Ask a Question About Your Data</div>
-        <form action="${Config.AMP.webAppUrl || '#'}" method="POST">
+        <form action="${Config.WEB_APP.url || '#'}" method="POST">
           <input type="text" class="text-input" name="question" placeholder="e.g., Show me wine sales from last week" required>
           <button type="submit" class="submit-btn">Get Report</button>
         </form>
@@ -235,42 +215,6 @@ const EmailService = {
     `;
   },
 
-  /**
-   * Build AMP version of daily report
-   * @param {Object} data Report data
-   * @returns {string} AMP HTML content
-   */
-  buildDailyReportAmp(data) {
-    // AMP implementation requires special headers and structure
-    // This is a placeholder for future AMP implementation
-    return `
-<!-- AMP Email Version -->
-<div>
-  <form method="post"
-        action-xhr="${Config.AMP.webAppUrl}/query">
-    <fieldset>
-      <label>
-        <span>Ask about your data:</span>
-        <textarea name="question"
-                  required
-                  placeholder="e.g., Compare beer vs wine sales this week"></textarea>
-      </label>
-      <input type="submit" value="Get Report">
-    </fieldset>
-    <div submit-success>
-      <template type="amp-mustache">
-        Report sent to your inbox!
-      </template>
-    </div>
-    <div submit-error>
-      <template type="amp-mustache">
-        Error: Please try again later.
-      </template>
-    </div>
-  </form>
-</div>
-    `;
-  },
 
   /**
    * Build HTML for weekly report
@@ -280,6 +224,9 @@ const EmailService = {
   buildWeeklyReportHtml(data) {
     // Extend daily report with weekly sections
     let html = this.buildDailyReportHtml(data.sundayData);
+
+    // Escape HTML in all user data
+    const esc = SecurityUtils.escapeHtml;
 
     // Add weekly special section
     const weeklySection = `
@@ -296,7 +243,7 @@ const EmailService = {
           <h3 style="font-size: 18px; color: #333;">🔍 Notable Trends This Week</h3>
           ${(data.significantChanges || []).map(change => `
             <div style="padding: 15px; background: #f8f9fa; border-left: 4px solid ${change.positive ? '#34A853' : '#EA4335'}; margin: 10px 0;">
-              <strong>${change.item}</strong>: ${change.description}
+              <strong>${esc(change.item)}</strong>: ${esc(change.description)}
             </div>
           `).join('')}
         </div>
@@ -305,7 +252,7 @@ const EmailService = {
         <div style="background: #fff3cd; padding: 20px; border-radius: 8px; border-left: 4px solid #FFA000;">
           <h3 style="color: #F57C00;">🔮 This Week's Projection</h3>
           <div style="font-size: 24px; font-weight: bold; color: #333;">Expected: $${(data.weeklyPrediction?.amount || 0).toLocaleString()}</div>
-          <div style="color: #666; margin-top: 10px;">${data.weeklyPrediction?.reasoning || 'Generating projection...'}</div>
+          <div style="color: #666; margin-top: 10px;">${esc(data.weeklyPrediction?.reasoning || 'Generating projection...')}</div>
         </div>
       </div>
     `;
@@ -315,15 +262,6 @@ const EmailService = {
     return html;
   },
 
-  /**
-   * Build AMP version of weekly report
-   * @param {Object} data Report data
-   * @returns {string} AMP HTML content
-   */
-  buildWeeklyReportAmp(data) {
-    // Reuse daily AMP template
-    return this.buildDailyReportAmp(data);
-  },
 
   /**
    * Log email sent for engagement tracking
@@ -371,7 +309,10 @@ const EmailService = {
    * @returns {boolean} Success status
    */
   sendQueryResponse(recipient, question, response) {
-    const subject = `Your Data Report: "${question.substring(0, 50)}${question.length > 50 ? '...' : ''}"`;
+    const subject = `Your Data Report: "${SecurityUtils.escapeHtml(question.substring(0, 50))}${question.length > 50 ? '...' : ''}"`;
+
+    // Escape HTML in all user data
+    const esc = SecurityUtils.escapeHtml;
 
     const htmlBody = `
 <!DOCTYPE html>
@@ -396,17 +337,17 @@ const EmailService = {
     </div>
 
     <div class="question">
-      <strong>You asked:</strong> ${question}
+      <strong>You asked:</strong> ${esc(question)}
     </div>
 
     <div class="answer">
-      ${response.summary}
+      ${esc(response.summary)}
     </div>
 
     ${response.charts ? response.charts.map(chart => `
       <div class="chart">
-        <h3>${chart.title}</h3>
-        <img src="${chart.url}" alt="${chart.title}" style="max-width: 100%;">
+        <h3>${esc(chart.title)}</h3>
+        <img src="${esc(chart.url)}" alt="${esc(chart.title)}" style="max-width: 100%;">
       </div>
     `).join('') : ''}
 
@@ -414,13 +355,13 @@ const EmailService = {
       <table class="data-table">
         <thead>
           <tr>
-            ${Object.keys(response.data[0]).map(key => `<th>${key}</th>`).join('')}
+            ${Object.keys(response.data[0]).map(key => `<th>${esc(key)}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
           ${response.data.slice(0, 10).map(row => `
             <tr>
-              ${Object.values(row).map(val => `<td>${val}</td>`).join('')}
+              ${Object.values(row).map(val => `<td>${esc(String(val))}</td>`).join('')}
             </tr>
           `).join('')}
         </tbody>

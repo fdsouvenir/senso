@@ -6,19 +6,32 @@
  */
 
 // --- CONFIGURATION ---
-// ACTION REQUIRED: Add your Gemini API Key here if you haven't already.
-const GEMINI_API_KEY = 'AIzaSyDOtv0hvusJYhKzj0Y8FQysLyBiB4QWQZI'; 
+// API key is now securely stored in Script Properties
+// Use SecureConfig.initialize() to set it up
 // --------------------
 
-const GEMINI_API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${GEMINI_API_KEY}`;
-
 const GeminiService = {
+  /**
+   * Get the Gemini API endpoint with the API key
+   * @returns {string} Complete API endpoint URL
+   */
+  getApiEndpoint: function() {
+    const apiKey = SecureConfig.getGeminiAPIKey();
+    return `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${apiKey}`;
+  },
+
   /**
    * Sends a PDF file to Gemini and asks it to extract structured data.
    * @param {DriveApp.File} file The PDF file to parse.
    * @returns {object|null} A parsed JSON object with the report data, or null on failure.
    */
   extractDataFromPdf: function(file) {
+    // Rate limiting check - max 10 requests per minute for Gemini API
+    const rateLimitKey = 'gemini_api_' + Session.getActiveUser().getEmail();
+    if (!SecurityUtils.checkRateLimit(rateLimitKey, 10, 60)) {
+      throw new Error('Gemini API rate limit exceeded. Please wait a moment before trying again.');
+    }
+
     const prompt = `
       You are an expert data extraction API. Your only function is to analyze the provided PDF Product Mix report and convert it into a structured JSON object.
 
@@ -62,7 +75,7 @@ const GeminiService = {
       'deadline': 90 
     };
     
-    const response = UrlFetchApp.fetch(GEMINI_API_ENDPOINT, options);
+    const response = UrlFetchApp.fetch(this.getApiEndpoint(), options);
     const responseText = response.getContentText();
 
     try {

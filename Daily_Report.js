@@ -13,6 +13,19 @@ const DailyReport = {
    */
   generate(reportDate = null) {
     try {
+      // Validate input date
+      if (reportDate !== null) {
+        if (!(reportDate instanceof Date) || isNaN(reportDate.getTime())) {
+          throw new Error('Invalid reportDate: must be a valid Date object');
+        }
+      }
+
+      // Rate limiting check - max 30 report generations per hour
+      const rateLimitKey = 'daily_report_' + Session.getActiveUser().getEmail();
+      if (!SecurityUtils.checkRateLimit(rateLimitKey, 30, 3600)) {
+        throw new Error('Report generation rate limit exceeded. Please wait before generating another report.');
+      }
+
       // Default to yesterday if no date provided
       const targetDate = reportDate || this.getYesterday();
       const dayOfWeek = Utilities.formatDate(targetDate, Config.REPORTS.daily.timezone, 'EEEE');
@@ -102,6 +115,11 @@ const DailyReport = {
    * @returns {Object} Day metrics
    */
   getDayMetrics(date) {
+    // Validate input date
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+      throw new Error('getDayMetrics: Invalid date parameter');
+    }
+
     const dateStr = Config.formatDate(date);
 
     const query = `
@@ -167,6 +185,11 @@ const DailyReport = {
    * @returns {Array} Categories with top items
    */
   getCategoryBreakdown(date) {
+    // Validate input date
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+      throw new Error('getCategoryBreakdown: Invalid date parameter');
+    }
+
     const dateStr = Config.formatDate(date);
 
     const query = `
@@ -274,6 +297,11 @@ const DailyReport = {
    * @returns {Object} Trend data with values and labels
    */
   getMultiWeekTrend(date) {
+    // Validate input date
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+      throw new Error('getMultiWeekTrend: Invalid date parameter');
+    }
+
     const dayOfWeek = date.getDay();
     const weeks = Config.REPORTS.daily.trendWeeks;
     const dates = [];
@@ -346,6 +374,11 @@ const DailyReport = {
    * @returns {Object} Prediction object
    */
   generatePrediction(targetDate) {
+    // Validate input date
+    if (!(targetDate instanceof Date) || isNaN(targetDate.getTime())) {
+      throw new Error('generatePrediction: Invalid date parameter');
+    }
+
     const dateStr = Config.formatDate(targetDate);
     const dayOfWeek = Utilities.formatDate(targetDate, Config.REPORTS.daily.timezone, 'EEEE');
 

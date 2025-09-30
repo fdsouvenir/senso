@@ -103,12 +103,11 @@ const Config = {
     ]
   },
 
-  // AMP for Email Settings
-  AMP: {
-    enabled: true,
-    webAppUrl: null,  // Will be set after deployment
+  // Web App Settings (for form submissions)
+  WEB_APP: {
+    url: null,  // Will be set after deployment
     corsAllowedOrigins: ['https://mail.google.com'],
-    fallbackToHtml: true
+    enabled: false  // Enable after web app deployment
   },
 
   // System Settings

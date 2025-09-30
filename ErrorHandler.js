@@ -338,12 +338,12 @@ const ErrorHandler = {
    * @param {string} context Context for logging
    * @returns {any} Function result
    */
-  async retryWithBackoff(fn, maxRetries = Config.SYSTEM.maxRetries, context = 'Operation') {
+  retryWithBackoff(fn, maxRetries = Config.SYSTEM.maxRetries, context = 'Operation') {
     let lastError;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        return await fn();
+        return fn();
       } catch (error) {
         lastError = error;
 
