@@ -1,0 +1,28 @@
+# Ignore temporary files
+tmp/
+tmp/**
+
+# Ignore version control
+.git/
+.git/**
+
+# Ignore node modules if any
+node_modules/
+node_modules/**
+
+# Ignore documentation files
+*.md
+LICENSE
+
+# Ignore clasp config
+.clasp.json
+.claspignore
+
+# Ignore any backup files
+*.backup
+*.bak
+*~
+
+# Ignore OS files
+.DS_Store
+Thumbs.db

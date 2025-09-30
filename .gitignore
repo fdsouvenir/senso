@@ -1,0 +1,32 @@
+# Temporary files
+tmp/
+tmp/**
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.backup
+*.bak
+*~
+
+# Environment variables
+.env
+*.env
+
+# Node modules (if any)
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# IDE files
+.vscode/
+.idea/
+
+# Credentials (be extra careful)
+*-key.json
+credentials.json
+token.json
