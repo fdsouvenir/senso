@@ -123,14 +123,25 @@ const ChartGenerator = {
     // Chart size
     params['chs'] = `${width}x${height}`;
 
-    // Chart data
-    const values = data.map(d => d.value || d);
-    const maxValue = Math.max(...values);
+    // Chart data - ensure we have valid numbers
+    const values = data.map(d => {
+      const val = d.value || d;
+      return isNaN(val) ? 0 : Number(val);
+    });
+
+    // Handle case where all values are 0 or empty
+    const maxValue = Math.max(...values) || 100;
     const minValue = Math.min(...values);
+
+    // If all values are the same, adjust range for better visibility
+    const range = maxValue - minValue;
+    const adjustedMax = range === 0 ? maxValue + (maxValue * 0.1 || 10) : maxValue;
+    const adjustedMin = range === 0 ? Math.max(0, minValue - (maxValue * 0.1 || 10)) : minValue;
+
     params['chd'] = `t:${values.join(',')}`;
 
     // Data scaling
-    params['chds'] = `${minValue},${maxValue}`;
+    params['chds'] = `${adjustedMin},${adjustedMax}`;
 
     // Chart title
     if (title) {
@@ -145,16 +156,16 @@ const ChartGenerator = {
     params['chls'] = '2';
 
     // Markers
-    params['chm'] = 'o,FFFFFF,0,-1,8|N,000000,0,-1,10';
+    params['chm'] = 'o,FFFFFF,0,-1,8';
 
     // Axis labels
-    if (labels) {
+    if (labels && labels.length > 0) {
       // X-axis labels
       params['chxl'] = `0:|${labels.join('|')}`;
       params['chxt'] = 'x,y';
 
       // Y-axis range
-      params['chxr'] = `1,${minValue},${maxValue}`;
+      params['chxr'] = `1,${Math.floor(adjustedMin)},${Math.ceil(adjustedMax)}`;
     }
 
     // Grid lines
@@ -487,5 +498,26 @@ const ChartGenerator = {
   getCachedChart(key) {
     const cache = CacheService.getDocumentCache();
     return cache.get(key);
+  },
+
+  /**
+   * Test function to generate a simple line chart
+   * @returns {string} Test chart URL
+   */
+  generateTestChart() {
+    // Simple test data
+    const testData = [100, 150, 125, 175, 200];
+    const testLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+    const url = this.generateLineChart(
+      testData,
+      'Test Sales Chart',
+      600, 300,
+      null,
+      testLabels
+    );
+
+    Logger.log('Test chart URL: ' + url);
+    return url;
   }
 };

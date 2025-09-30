@@ -188,12 +188,19 @@ const EmailService = {
       `).join('')}
 
       <!-- Trend Chart -->
-      ${data.trendChartUrl ? `
+      ${data.trendChartUrl && data.trendChartUrl.length > 0 ? `
         <div class="chart-section">
           <div class="chart-title">3-Week ${data.dayName} Trend</div>
-          <img src="${data.trendChartUrl}" alt="Sales trend" style="max-width: 100%; height: auto;">
+          <img src="${data.trendChartUrl}" alt="Sales trend for past 3 ${data.dayName}s" style="max-width: 100%; height: auto; display: block; margin: 0 auto;">
         </div>
-      ` : ''}
+      ` : `
+        <div class="chart-section">
+          <div class="chart-title">3-Week ${data.dayName} Trend</div>
+          <div style="padding: 20px; background: #f8f9fa; color: #666; text-align: center;">
+            Chart data not available
+          </div>
+        </div>
+      `}
 
       <!-- Prediction -->
       <div class="prediction-box">

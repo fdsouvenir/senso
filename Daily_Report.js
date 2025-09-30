@@ -35,14 +35,27 @@ const DailyReport = {
         ? ((totalSales - previousSales) / previousSales * 100)
         : 0;
 
-      // Generate trend chart URL
-      const trendChartUrl = ChartGenerator.generateLineChart(
-        multiWeekTrend.values,
-        `${dayOfWeek} Sales Trend`,
-        600, 300,
-        null,
-        multiWeekTrend.labels
-      );
+      // Generate trend chart URL - only if we have data
+      let trendChartUrl = '';
+      if (multiWeekTrend.values && multiWeekTrend.values.length > 0) {
+        // Log the data for debugging
+        ErrorHandler.debug('DailyReport', 'Trend data', {
+          values: multiWeekTrend.values,
+          labels: multiWeekTrend.labels
+        });
+
+        // Use simpler title without special characters
+        const chartTitle = dayOfWeek + ' Sales Trend';
+        trendChartUrl = ChartGenerator.generateLineChart(
+          multiWeekTrend.values,
+          chartTitle,
+          600, 300,
+          null,
+          multiWeekTrend.labels
+        );
+      } else {
+        ErrorHandler.warn('DailyReport', 'No trend data available for chart');
+      }
 
       return {
         date: Config.formatDate(targetDate),

@@ -38,6 +38,7 @@ function onOpen() {
     .addSeparator()
     .addItem('Send Test Daily Report', 'sendTestDailyReport')
     .addItem('Send Test Weekly Report', 'sendTestWeeklyReport')
+    .addItem('Test Chart Generation', 'testChartGeneration')
     .addSeparator()
     .addItem('Enable Daily Reports', 'enableDailyReports')
     .addItem('Enable Weekly Reports', 'enableWeeklyReports')
@@ -335,6 +336,46 @@ function sendTestWeeklyReport() {
     ui.alert('Coming Soon', 'Weekly report functionality will be implemented in the next phase.', ui.ButtonSet.OK);
   } catch (error) {
     ErrorHandler.handleError(error, 'sendTestWeeklyReport', {}, true);
+  }
+}
+
+/**
+ * Test chart generation
+ */
+function testChartGeneration() {
+  try {
+    const ui = SpreadsheetApp.getUi();
+
+    // Test basic chart generation
+    const testUrl = ChartGenerator.generateTestChart();
+
+    // Test with actual data
+    const sampleData = [1000, 1200, 1100, 1300, 1250, 1400, 1350];
+    const sampleLabels = ['9/21', '9/22', '9/23', '9/24', '9/25', '9/26', '9/27'];
+
+    const actualUrl = ChartGenerator.generateLineChart(
+      sampleData,
+      'Sample Sales Trend',
+      600, 300,
+      null,
+      sampleLabels
+    );
+
+    // Show URLs to user
+    const message = `Chart URLs Generated:\n\n` +
+      `Test Chart:\n${testUrl}\n\n` +
+      `Sample Chart:\n${actualUrl}\n\n` +
+      `Copy and paste these URLs into a browser to test if they work.`;
+
+    ui.alert('Chart Test', message, ui.ButtonSet.OK);
+
+    // Also log for debugging
+    Logger.log('Test chart URL: ' + testUrl);
+    Logger.log('Sample chart URL: ' + actualUrl);
+
+  } catch (error) {
+    ErrorHandler.handleError(error, 'testChartGeneration', {}, true);
+    SpreadsheetApp.getUi().alert('Error', `Chart generation failed: ${error.toString()}`, SpreadsheetApp.getUi().ButtonSet.OK);
   }
 }
 
