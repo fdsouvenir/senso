@@ -66,3 +66,4 @@ Gmail → GmailHarvester.js → Drive Storage
 - OAuth2 library: `1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF`
 - BigQuery Advanced Service v2
 - Google Gemini API (external)
+- when deploying push to github and to clasp
